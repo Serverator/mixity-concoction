@@ -4,29 +4,30 @@ use bevy_embedded_assets::EmbeddedAssetPlugin;
 mod player;
 mod world;
 mod effects;
+mod physics;
+mod window;
+mod input;
+
+#[cfg(debug_assertions)]
+mod debug;
 
 fn main() {
-	App::default()
-		.add_plugins(
+	let mut app = App::default();
+
+	app.add_plugins(
 			DefaultPlugins
 				.build()
 				.add_before::<bevy::asset::AssetPlugin, _>(EmbeddedAssetPlugin)
+				.set(window::get_window_plugin()),
 		)
-		.add_plugin(DebugPlugin)
 		.add_plugin(player::PlayerPlugin)
 		.add_plugin(world::WorldPlugin)
-		.run();
-}
+		.add_plugin(physics::PhysicsPlugin)
+		.add_plugin(window::WindowPlugin)
+		.add_plugin(input::InputPlugin);
+		
+	#[cfg(debug_assertions)]	
+	app.add_plugin(debug::DebugPlugin);
 
-pub struct DebugPlugin;
-impl Plugin for DebugPlugin {
-	#[cfg(debug_assertions)]
-	fn build(&self, app: &mut App) {
-		use bevy_inspector_egui::quick::WorldInspectorPlugin;
-
-		app.add_plugin(WorldInspectorPlugin::new());
-	}
-
-	#[cfg(not(debug_assertions))]
-	fn build(&self, app: &mut App) {}
+	app.run();
 }

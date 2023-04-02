@@ -1,6 +1,7 @@
 use std::f32::consts::PI;
 
-use bevy::{prelude::*, core_pipeline::fxaa::Fxaa};
+use bevy::prelude::*;
+use bevy_rapier3d::prelude::*;
 
 pub struct WorldPlugin;
 
@@ -11,35 +12,22 @@ impl Plugin for WorldPlugin {
 	}
 }
 
-#[derive(Component, Clone, Copy, Debug)]
-pub struct WorldCamera;
-
 fn init_world(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-	// Camera
-	commands.spawn((
-		WorldCamera,
-		Camera3dBundle {
-			transform: Transform::from_xyz(0.0, 8.0, 0.0).with_rotation(Quat::from_rotation_x(-PI/6.0)),
-			..default()
-		},
-		Fxaa {
-			enabled: true,
-			..default()
-		},
-	));
-
+	let plane_mesh = Mesh::from(shape::Plane { size: 100.0, subdivisions: 1 });
 	// Plane
 	commands.spawn((
 		Name::new("Main Plane"),
+		Collider::from_bevy_mesh(&plane_mesh, &ComputedColliderShape::TriMesh).unwrap(),
 		PbrBundle {
-			mesh: meshes.add(Mesh::from(shape::Plane { size: 100.0, subdivisions: 1 })),
+			mesh: meshes.add(plane_mesh),
 			material: materials.add(Color::rgb(0.3, 0.5, 0.3).into()),
 			..default()
 		},
+		RigidBody::Fixed,
 	));
 
 	// Light

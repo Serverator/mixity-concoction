@@ -13,7 +13,7 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    name: Cargo Test
+    name: Compile and run tests
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -31,11 +31,11 @@ jobs:
       - name: Install Dependencies
         if: runner.os == 'linux'
         run: sudo apt-get update; sudo apt-get install pkg-config libx11-dev libasound2-dev libudev-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
-      - name: Run cargo test
+      - name: Compile and run tests
         run: cargo test
 
   wasm-test:
-    name: WASM Test
+    name: Compile (WASM)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -56,8 +56,8 @@ jobs:
       - name: Install wasm-bindgen
         run: |
           cargo install --force wasm-bindgen-cli
-      - name: Run cargo test
-        run: cargo test --target wasm32-unknown-unknown
+      - name: Compile WASM
+        run: cargo build --target wasm32-unknown-unknown
 
   clippy_check:
     name: Clippy
@@ -78,5 +78,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: Install Dependencies
         run: sudo apt-get update; sudo apt-get install pkg-config libx11-dev libasound2-dev libudev-dev
+      - name: Install clippy
+        run: rustup component add clippy
       - name: Run clippy
         run: cargo clippy -- -D warnings

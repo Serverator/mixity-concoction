@@ -27,6 +27,8 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: | 
+            ${{ runner.os }}-cargo-test-
       - uses: dtolnay/rust-toolchain@nightly
       - name: Install Dependencies
         if: runner.os == 'linux'
@@ -50,6 +52,8 @@ jobs:
             ~/.cargo/git/db/
             target/
           key: ${{ runner.os }}-cargo-wasm-test-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-test-
       - uses: dtolnay/rust-toolchain@nightly
         with:
           target: wasm32-unknown-unknown

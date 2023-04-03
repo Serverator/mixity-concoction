@@ -7,10 +7,18 @@ pub struct WorldPlugin;
 impl Plugin for WorldPlugin {
 	fn build(&self, app: &mut App) {
 		app
-			.add_startup_system(init_world)
-			.add_startup_system(spawn_trees)
-			.add_startup_system(spawn_bushes)
-			.add_system(init_loaded_scenes);
+		.add_systems(
+			(
+				init_world,
+				spawn_trees,
+				spawn_bushes,
+			)
+				.in_schedule(OnEnter(GameState::InGame))
+		)
+		.add_system(
+			init_loaded_scenes
+				.in_set(OnUpdate(GameState::InGame))
+		);
 	}
 }
 

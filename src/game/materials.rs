@@ -1,4 +1,6 @@
-use bevy::{render::{render_resource::{ShaderRef, AsBindGroup}, once_cell::sync::OnceCell}, reflect::TypeUuid};
+use std::borrow::BorrowMut;
+
+use bevy::{render::{render_resource::{ShaderRef, AsBindGroup, SamplerDescriptor, AddressMode, FilterMode}, once_cell::sync::OnceCell, texture::ImageSampler}, reflect::TypeUuid};
 
 use crate::prelude::*;
 
@@ -8,16 +10,29 @@ impl Plugin for CustomMaterialPlugin {
 	fn build(&self, app: &mut App) {
 		app
 			.add_plugin(MaterialPlugin::<FoliageMaterial>::default())
-			.add_startup_system(init);
+			.add_system(set_dither_texture.in_schedule(OnExit(GameState::Loading)));
 	}
 }
 
 static DITHER_HANDLE: OnceCell<Handle<Image>> = OnceCell::new();
 
-pub fn init(
-	asset_server: Res<AssetServer>,
+pub fn set_dither_texture(
+	game_assets: Res<GameAssets>,
+	mut image_assets: ResMut<Assets<Image>>,
 ) {
-	DITHER_HANDLE.set(asset_server.load("textures/dither.png")).unwrap();
+	let image_mut = image_assets.get_mut(&game_assets.dither_texture).unwrap();
+
+	image_mut.sampler_descriptor = ImageSampler::Descriptor(
+		SamplerDescriptor { 
+			address_mode_u: AddressMode::Repeat,
+			address_mode_v: AddressMode::Repeat,
+			address_mode_w: AddressMode::Repeat,
+			mag_filter: FilterMode::Nearest,
+			..Default::default() 
+		}
+	);
+
+	DITHER_HANDLE.set(game_assets.dither_texture.clone()).unwrap();
 }
 
 #[derive(AsBindGroup, TypeUuid, Debug, Clone)]
@@ -46,7 +61,7 @@ impl Material for FoliageMaterial {
 	}
 
 	fn alpha_mode(&self) -> AlphaMode {
-		AlphaMode::Mask(0.5)
+		AlphaMode::Opaque//Mask(0.5)
 	}
 
 }

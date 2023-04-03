@@ -5,9 +5,17 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
 	fn build(&self, app: &mut App) {
 		app
-			.add_startup_system(spawn_player)
-			.add_system(camera_follow)
-			.add_system(move_player);
+			.add_system(
+				spawn_player
+					.in_schedule(OnEnter(GameState::InGame))
+			)
+			.add_systems(
+				(
+					camera_follow,
+					move_player,
+				)
+					.in_set(OnUpdate(GameState::InGame))
+			);
 	}
 }
 
@@ -40,7 +48,7 @@ pub fn spawn_player(
 			..default()
 		}, 
 		// Inputs
-		crate::input::default_inputs(),
+		crate::game::input::default_inputs(),
 
 		// Rapier physics components
 		RigidBody::KinematicVelocityBased,
@@ -107,15 +115,18 @@ pub fn camera_follow(
 	};
 
 	// Camera "zoom"
-	let wheel_delta = input.axis_pair(Action::Zoom).unwrap().y() * (-1.0/15.0);//.iter().fold(0.0, |acc, motion| acc - motion.y) * 0.05;
-	distance.0 = (distance.0 + wheel_delta).clamp(0.0, 1.0);
-
+	if let Some(wheel_delta) = input.axis_pair(Action::Zoom) {
+		const WHEEL_SENSITIVITY: f32 = 1.0 / 15.0;
+		distance.0 = (distance.0 - wheel_delta.y() * WHEEL_SENSITIVITY ).clamp(0.0, 1.0);
+	}
+	
 	let (mut y_rot, _, _) = camera_transform.rotation.to_euler(EulerRot::YXZ);
 
 	// Move camera with mouse motion
 	if input.pressed(Action::ActivateLook) {
-		let mouse_delta = input.axis_pair(Action::Look).unwrap();
-		y_rot += mouse_delta.x() * -0.005;
+		if let Some(mouse_delta) = input.axis_pair(Action::Look) {
+			y_rot += mouse_delta.x() * -0.005;
+		}
 	}
 
 	camera_transform.rotation = Quat::from_euler(EulerRot::YXZ, y_rot, lerp(-PI/6.2,-PI/4.0,distance.0.powi(2)), 0.0);

@@ -1,5 +1,4 @@
-use bevy::prelude::*;
-use bevy_rapier3d::prelude::*;
+use crate::prelude::*;
 
 pub struct PhysicsPlugin;
 impl Plugin for PhysicsPlugin {

@@ -1,12 +1,12 @@
 /// This mod exists only in debug mode
-
-use bevy::prelude::*;
+use crate::prelude::*;
 
 pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
 	fn build(&self, app: &mut App) {
-		use bevy_inspector_egui::quick::WorldInspectorPlugin;
-		app.add_plugin(WorldInspectorPlugin::new());
+		app
+			.add_plugin(WorldInspectorPlugin::new())
+			.add_plugin(DebugLinesPlugin::with_depth_test(true));
 	}
 }

@@ -1,55 +1,72 @@
-use std::f32::consts::SQRT_2;
-
-use bevy::{prelude::*};
-use leafwing_input_manager::{prelude::*, axislike::DualAxisData, systems::update_action_state, plugin::InputManagerSystem};
+use crate::prelude::*;
 
 pub struct InputPlugin;
 impl Plugin for InputPlugin {
 	fn build(&self, app: &mut App) {
 		app
 			.add_plugin(InputManagerPlugin::<Action>::default())
-			.add_system(mock_input.in_set(InputManagerSystem::ManualControl));
+			.add_system(cursor_grab_system);
+	}
+}
+
+pub fn default_inputs() -> InputManagerBundle::<Action> {
+	InputManagerBundle::<Action> {
+		action_state: ActionState::default(),
+		input_map: InputMap::default()
+			.insert(DualAxis::left_stick(), Action::Move)
+			.insert(VirtualDPad::wasd(), Action::Move)
+			.insert(KeyCode::E, Action::Use)
+			.insert(GamepadButtonType::RightTrigger2, Action::Use)
+			.insert(DualAxis::right_stick(), Action::Look)
+			.insert(DualAxis::mouse_motion(), Action::Look)
+			.insert(MouseButton::Right, Action::ActivateLook)
+			.insert(DualAxis::mouse_wheel(), Action::Zoom)
+			.build(),
 	}
 }
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum Action {
     Move,
-	MoveForward,
-	MoveBack,
-	MoveLeft,
-	MoveRight,
 	Use,
 	Look,
+	ActivateLook,
 	Zoom,
 }
 
-// I wish I could bind DualAxis to actual keyboard buttons to stop this...
-fn mock_input(
-	mut input_query: Query<&mut ActionState<Action>>
+pub fn cursor_grab_system(
+    mut windows: Query<&mut Window>,
+    //mouse: Res<Input<MouseButton>>,
+	input: Query<&ActionState<Action>>,
+    //key: Res<Input<KeyCode>>,
+	//mut cursor_mode: ResMut<CursorMode>,
+	#[cfg(debug_assertions)]
+    mut gui: Query<&mut bevy_inspector_egui::bevy_egui::EguiContext>,
 ) {
-	use Action::*;
+    let mut window = windows.single_mut();
 
-	for mut input in &mut input_query {
+	let Ok(input) = input.get_single() else {
+		return;
+	};
 
-		let mut keyboard_input = Vec2 {
-			y: match (input.pressed(MoveForward),input.pressed(MoveBack)) {
-				(true,false) => 1.0,
-				(false,true) => -1.0,
-				_ => 0.0 },
-			x: match (input.pressed(MoveLeft),input.pressed(MoveRight)) {
-				(true,false) => -1.0,
-				(false,true) => 1.0,
-				_ => 0.0 },
-		};
-
-		let length = keyboard_input.length_squared();
-		if length != 0.0 {
-			if length > 1.0 {
-				keyboard_input /= SQRT_2
-			}
-			let move_data = input.action_data_mut(Move);
-			move_data.axis_pair = Some(DualAxisData::from_xy(keyboard_input));
+	#[cfg(debug_assertions)]
+	{
+		let mut gui = gui.single_mut();
+		if input.just_pressed(Action::ActivateLook) && !gui.get_mut().is_pointer_over_area() {
+			window.cursor.grab_mode = bevy::window::CursorGrabMode::Locked;
+			window.cursor.visible = false;
 		}
 	}
+
+	#[cfg(not(debug_assertions))]
+    if input.just_pressed(Action::ActivateLook) {
+        window.cursor.grab_mode = bevy::window::CursorGrabMode::Locked;
+        window.cursor.visible = false;
+		*cursor_mode = CursorMode::Locked;
+    }
+
+    if input.just_released(Action::ActivateLook) {
+        window.cursor.grab_mode = bevy::window::CursorGrabMode::None;
+        window.cursor.visible = true;
+    }
 }

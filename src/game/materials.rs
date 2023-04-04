@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 use bevy::{render::{render_resource::{ShaderRef, AsBindGroup, SamplerDescriptor, AddressMode, FilterMode}, once_cell::sync::OnceCell, texture::ImageSampler}, reflect::TypeUuid};
 
 use crate::prelude::*;

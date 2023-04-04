@@ -62,7 +62,6 @@ pub fn cursor_grab_system(
     if input.just_pressed(Action::ActivateLook) {
         window.cursor.grab_mode = bevy::window::CursorGrabMode::Locked;
         window.cursor.visible = false;
-		*cursor_mode = CursorMode::Locked;
     }
 
     if input.just_released(Action::ActivateLook) {

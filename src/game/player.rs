@@ -84,7 +84,7 @@ pub fn move_player(
 	#[cfg(debug_assertions)]
 	mut lines: ResMut<DebugLines>,
 ) {
-	let (Ok((transform, mut controller,input)), Ok(camera_transform)) = (player_query.get_single_mut(),cam_query.get_single()) else {
+	let (Ok((_transform, mut controller,input)), Ok(camera_transform)) = (player_query.get_single_mut(),cam_query.get_single()) else {
 		return;
 	};
 
@@ -95,7 +95,7 @@ pub fn move_player(
 		let (y_rot,_,_) = camera_transform.rotation.to_euler(EulerRot::YXZ);
 
 		#[cfg(debug_assertions)]
-		lines.line(transform.translation, transform.translation + Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * 2.0, 0.0);
+		lines.line(_transform.translation, _transform.translation + Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * 2.0, 0.0);
 		
 		controller.translation = Some(Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * time.delta_seconds() * 9.0); 
 	};

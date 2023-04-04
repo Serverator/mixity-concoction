@@ -1,4 +1,4 @@
-use bevy::{math::Vec3Swizzles, scene::SceneInstance};
+use bevy::{math::Vec3Swizzles, scene::SceneInstance, gltf::Gltf};
 
 use crate::prelude::*;
 
@@ -63,9 +63,9 @@ pub struct Tree;
 
 fn spawn_trees(
 	mut command: Commands,
-	asset_server: Res<AssetServer>,
+    assets: Res<GameAssets>,
+    gltfs: Res<Assets<Gltf>>,
 ) {
-	let tree_scene: Handle<Scene> = asset_server.load("models/Tree.gltf#Scene0");
 	let mut rng = thread_rng();
 
 	for i in 0..1500 {
@@ -79,7 +79,7 @@ fn spawn_trees(
 			Name::new(format!("Tree {i}")),
 			Collider::cylinder(4.0, 0.8),
 			SceneBundle {
-				scene: tree_scene.clone(),
+				scene: gltfs.get(&assets.tree_gltf).unwrap().scenes[0].clone(),
 				transform: Transform::from_translation(position.extend(0.0).xzy()).with_scale(Vec3::splat(rng.gen_range(0.25..0.6))).with_rotation(Quat::from_rotation_y(rng.gen_range(-PI..PI))),
 				..default()
 			},
@@ -95,10 +95,9 @@ fn init_loaded_scenes(
 	mut commands: Commands,
 	scene_manager: Res<SceneSpawner>,
 	mut material_assets: ResMut<Assets<FoliageMaterial>>,
-	_material_query: Query<&mut Handle<StandardMaterial>>,
-	name_query: Query<&Name>,
+	name_query: Query<&Name, With<Handle<StandardMaterial>>>,
 	children_query: Query<&Children>,
-	tree_query: Query<(Entity,&SceneInstance),(With<Tree>, Or<(Without<SceneLoaded>, (With<SceneLoaded>, Changed<SceneInstance>))>)>
+	tree_query: Query<(Entity,&SceneInstance),(Or<(With<Tree>, With<Bush>)>, Or<(Without<SceneLoaded>, (With<SceneLoaded>, Changed<SceneInstance>))>)>
 ) {
 	let mut rng = thread_rng();
 
@@ -108,14 +107,17 @@ fn init_loaded_scenes(
 		}
 		commands.entity(entity).insert(SceneLoaded);
 
-		// let leaves_material = material_assets.add(StandardMaterial {
-		// 	base_color: Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.5),
-		// 	perceptual_roughness: 0.5,
-		// 	..default()
-		// });
+        const COLORS: &[Color] = &[
+            Color::GREEN,
+            Color::LIME_GREEN,
+            Color::YELLOW_GREEN,
+            Color::ORANGE,
+            Color::ORANGE_RED,
+            Color::RED,
+        ];
 
 		let leaves_material = material_assets.add(FoliageMaterial {
-			color: Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.5),
+			color: COLORS[rng.gen_range(0..(COLORS.len()))], //Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.5),
 			..default()
 		});
 
@@ -124,16 +126,11 @@ fn init_loaded_scenes(
 		for child in children_query.iter_descendants(entity) {
 			if let Ok(name) = name_query.get(child) {
 				match name.as_str() {
-					"Trunk Mesh" => {
-						//let mut material = material_query.get_mut(child).unwrap();
-						//*material = leaves_material.clone();
-					}
-					"Leaves Mesh" => {
+					i if i.contains("Trunk") => {}
+					i if i.contains("Leaves") => {
 						commands.entity(child)
 							.remove::<Handle<StandardMaterial>>()
 							.insert(leaves_material.clone());
-						//let mut material = material_query.get_mut(child).unwrap();
-						//*material = leaves_material.clone();
 					}
 					_ => {}
 				}
@@ -143,10 +140,13 @@ fn init_loaded_scenes(
 	}
 }
 
+#[derive(Component)]
+pub struct Bush;
+
 fn spawn_bushes(
 	mut command: Commands,
-	mut meshes: ResMut<Assets<Mesh>>,
-	mut materials: ResMut<Assets<StandardMaterial>>,
+    assets: Res<GameAssets>,
+    gltfs: Res<Assets<Gltf>>,
 ) {
 	
 	let mut rng = thread_rng();
@@ -157,11 +157,11 @@ fn spawn_bushes(
 		}
 
 		command.spawn((
+            Bush,
 			Name::new(format!("Bush {i}")),
-			PbrBundle {
-				transform: Transform::from_translation(position.extend(0.6).xzy()),
-				mesh: meshes.add(Mesh::try_from(shape::Icosphere { radius: rng.gen_range(1.2..2.5), subdivisions: 0 }).unwrap()),
-				material: materials.add(Color::rgb(0.2, 0.8, 0.2).into()),
+            SceneBundle {
+				scene: gltfs.get(&assets.bush_gltf).unwrap().scenes[rng.gen_range(0..=1)].clone(),
+				transform: Transform::from_translation(position.extend(0.0).xzy()).with_scale(Vec3::splat(rng.gen_range(1.3..1.8))).with_rotation(Quat::from_rotation_y(rng.gen_range(-PI..PI))),
 				..default()
 			},
 		));

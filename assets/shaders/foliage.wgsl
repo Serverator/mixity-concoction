@@ -20,7 +20,7 @@ fn fragment(
     let ambient_light = lights.ambient_color;
     let screen_uv = position.xy / view.viewport.zw;
 
-    let lighting = dot(directional_light.direction_to_light,world_normal);
+    let lighting = (dot(directional_light.direction_to_light,world_normal) + 1.0) / 2.0;
 
     let center = view.viewport.zw / 2.0;
     let distance = 1.5 - distance(position.xy,center) / 100.0;
@@ -28,18 +28,18 @@ fn fragment(
 	let uv = position.xy / 16.0;
     let alpha = textureSample(base_color_texture, base_color_sampler, uv).x;
 
-    if alpha < distance {
-        discard;
-    }
+    // if alpha < distance {
+        // discard;
+    // }
 
     var color = material.color.xyz;
     if lighting < 0.5 {
         color /= 2.0;
     }
-        if lighting < 0.75 {
+    if lighting < 0.75 {
         color /= 2.0;
     }
-        if lighting < 0.25 {
+    if lighting < 0.25 {
         color /= 2.0;
     }
 

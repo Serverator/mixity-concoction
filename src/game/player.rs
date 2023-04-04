@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use bevy::{core_pipeline::fxaa::Fxaa, math::Vec3Swizzles};
 
+use super::world::Ingridient;
+
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
 	fn build(&self, app: &mut App) {
@@ -13,6 +15,7 @@ impl Plugin for PlayerPlugin {
 				(
 					camera_follow,
 					move_player,
+					pickup_entity,
 				)
 					.in_set(OnUpdate(GameState::InGame))
 			);
@@ -25,6 +28,9 @@ pub struct Player;
 #[derive(Component, Clone, Copy, Debug)]
 pub struct PlayerCamera;
 
+#[derive(Component, Clone, Debug, Default)]
+pub struct Inventory(Vec<Ingridient>);
+
 pub fn spawn_player(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
@@ -34,6 +40,7 @@ pub fn spawn_player(
 	commands.spawn((
 		Name::new("Player"),
 		Player,
+		Inventory::default(),
 		PbrBundle {
 			mesh: meshes.add(Mesh::from(
 				shape::Capsule 
@@ -97,17 +104,43 @@ pub fn move_player(
 		#[cfg(debug_assertions)]
 		lines.line(_transform.translation, _transform.translation + Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * 2.0, 0.0);
 		
-		controller.translation = Some(Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * time.delta_seconds() * 9.0); 
+		controller.translation = Some(Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * time.delta_seconds() * 14.0); 
 	};
 
+}
+
+pub fn pickup_entity(
+	mut commands: Commands,
+	mut player_query: Query<(&Transform, &ActionState<Action>, &mut Inventory), With<Player>>,
+	ingridient_query: Query<(Entity, &Transform, &Ingridient)>,
+) {
+	let Ok((player_transform, input, mut inventory)) = player_query.get_single_mut() else {
+		return;
+	};
+
+	if input.just_pressed(Action::Use) {
+		let closest_ingridient = &ingridient_query.iter().filter_map(|(entity,ingr_transform,ingridient)| {
+			let distance_sq = (ingr_transform.translation - player_transform.translation).length_squared();
+			if distance_sq < 10.0 {
+				Some((distance_sq, entity, ingridient))
+			} else {
+				None
+			}
+		}).min_by(|(dist_a,_,_),(dist_b,_,_)| dist_a.total_cmp(dist_b));
+
+		if let Some((_,ingr_entity,ingridient)) = closest_ingridient {
+			inventory.0.push(**ingridient);
+			commands.entity(*ingr_entity).despawn_recursive();
+		}
+	}
 }
 
 pub fn camera_follow(
 	mut cam_query: Query<&mut Transform, (With<PlayerCamera>, Without<Player>)>,
 	player_query: Query<(Entity, &Transform, &ActionState<Action>), With<Player>>,
-	//mut mouse_input: EventReader<MouseMotion>,
-	//mut scroll_input: EventReader<MouseWheel>,
 	mut distance: Local<CameraDistance>,
+	#[cfg(debug_assertions)]
+    mut gui: Query<&mut bevy_inspector_egui::bevy_egui::EguiContext>,
 ) {
 	let (Ok(mut camera_transform), Ok((_player, _player_transform, input))) = (cam_query.get_single_mut(), player_query.get_single()) else {
 		warn!("Couldn't find player camera or player from query!");
@@ -115,6 +148,15 @@ pub fn camera_follow(
 	};
 
 	// Camera "zoom"
+	#[cfg(debug_assertions)]
+	if !gui.single_mut().get_mut().is_pointer_over_area() {
+		if let Some(wheel_delta) = input.axis_pair(Action::Zoom) {
+			const WHEEL_SENSITIVITY: f32 = 1.0 / 15.0;
+			distance.0 = (distance.0 - wheel_delta.y() * WHEEL_SENSITIVITY ).clamp(0.0, 1.0);
+		}
+	}
+
+	#[cfg(not(debug_assertions))]
 	if let Some(wheel_delta) = input.axis_pair(Action::Zoom) {
 		const WHEEL_SENSITIVITY: f32 = 1.0 / 15.0;
 		distance.0 = (distance.0 - wheel_delta.y() * WHEEL_SENSITIVITY ).clamp(0.0, 1.0);

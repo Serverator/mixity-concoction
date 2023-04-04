@@ -1,3 +1,5 @@
+use bevy_inspector_egui::quick::StateInspectorPlugin;
+
 /// This mod exists only in debug mode
 use crate::prelude::*;
 
@@ -7,6 +9,7 @@ impl Plugin for DebugPlugin {
 	fn build(&self, app: &mut App) {
 		app
 			.add_plugin(WorldInspectorPlugin::new())
-			.add_plugin(DebugLinesPlugin::with_depth_test(true));
+			.add_plugin(DebugLinesPlugin::with_depth_test(true))
+			.add_plugin(StateInspectorPlugin::<GameState>::default());
 	}
 }

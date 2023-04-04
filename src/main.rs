@@ -35,7 +35,7 @@ fn main() {
 	app.run();
 }
 
-#[derive(States, Default, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(States, Default, Debug, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum GameState {
 	#[default]
 	Loading,

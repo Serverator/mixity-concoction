@@ -19,3 +19,4 @@ bevy_rapier3d = "0.21.0"
 leafwing-input-manager = "0.9.1"
 bevy_prototype_debug_lines = { version = "0.10.1", features = ["3d"] }
 bevy_asset_loader = "0.16.0"
+smallvec = "1.10.0"

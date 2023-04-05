@@ -1,8 +1,8 @@
 #import bevy_pbr::mesh_view_bindings
 #import bevy_pbr::mesh_bindings
-
+//#import bevy_pbr::mesh_functions
 #import bevy_pbr::utils
-#import bevy_pbr::shadows
+//#import bevy_pbr::shadows
 
 struct Foliage {
     color: vec4<f32>,
@@ -20,10 +20,81 @@ var<uniform> material: Foliage;
 // @group(1) @binding(2)
 // var base_color_sampler: sampler;
 
+
+
+struct Vertex {
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+// #ifdef VERTEX_UVS
+//     @location(2) uv: vec2<f32>,
+// #endif
+// #ifdef VERTEX_TANGENTS
+//     @location(3) tangent: vec4<f32>,
+// #endif
+// #ifdef VERTEX_COLORS
+//     @location(4) color: vec4<f32>,
+// #endif
+// #ifdef SKINNED
+//     @location(5) joint_indices: vec4<u32>,
+//     @location(6) joint_weights: vec4<f32>,
+// #endif
+};
+
+struct VertexOutput {
+    //@builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) world_normal: vec3<f32>,
+// #ifdef VERTEX_UVS
+//     @location(2) uv: vec2<f32>,
+// #endif
+// #ifdef VERTEX_TANGENTS
+//     @location(3) world_tangent: vec4<f32>,
+// #endif
+// #ifdef VERTEX_COLORS
+//     @location(4) color: vec4<f32>,
+// #endif
+};
+
+@vertex
+fn vertex(in: Vertex) -> VertexOutput {
+    var out: VertexOutput;
+
+    out.world_normal = normalize(
+        mat3x3<f32>(
+            mesh.inverse_transpose_model[0].xyz,
+            mesh.inverse_transpose_model[1].xyz,
+            mesh.inverse_transpose_model[2].xyz
+        ) * in.normal
+    );
+    out.world_position = mesh.model * vec4<f32>(in.position, 1.0);
+
+    // #ifdef SKINNED
+    // var model = skin_model(in.joint_indices, in.joint_weights);
+    // out.world_normal = skin_normals(model, in.normal);
+    // #else
+    // var model = mesh.model;
+    // out.world_normal = mesh_normal_local_to_world(in.normal);
+    // #endif
+    // out.world_position = mesh_position_local_to_world(model, vec4<f32>(in.position, 1.0));
+    // #ifdef VERTEX_UVS
+    //     out.uv = in.uv;
+    // #endif
+    // #ifdef VERTEX_TANGENTS
+    //     out.world_tangent = mesh_tangent_local_to_world(model, in.tangent);
+    // #endif
+    // #ifdef VERTEX_COLORS
+    //     out.color = in.color;
+    // #endif
+
+    return out;
+}
+
 @fragment
 fn fragment(
 	@builtin(position) position: vec4<f32>,
     #import bevy_pbr::mesh_vertex_output
+    //@location(0) world_position: vec4<f32>,
+    //@location(1) world_normal: vec3<f32>,
 ) -> @location(0) vec4<f32> {
 
     //let ambient_light = lights.ambient_color;
@@ -47,10 +118,10 @@ fn fragment(
 
     var shadow: f32 = 0.0;
 
-    let n_directional_lights = lights.n_directional_lights;
-    for (var i: u32 = 0u; i < n_directional_lights; i = i + 1u) {
-        shadow = 1.0-fetch_directional_shadow(i, world_position, world_normal, view_z);
-    }
+    // let n_directional_lights = lights.n_directional_lights;
+    // for (var i: u32 = 0u; i < n_directional_lights; i = i + 1u) {
+    //     shadow = 1.0-fetch_directional_shadow(i, world_position, world_normal, view_z);
+    // }
 
     let light_direction = lights.directional_lights[0].direction_to_light;
 

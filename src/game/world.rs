@@ -1,14 +1,16 @@
-use bevy::{math::Vec3Swizzles, scene::SceneInstance, gltf::Gltf, pbr::NotShadowReceiver};
+use bevy::{scene::SceneInstance, render::{view::RenderLayers, camera::ScalingMode}, core_pipeline::{fxaa::Fxaa, clear_color::ClearColorConfig}};
 
-use crate::prelude::*;
 
-use super::effects::{MainEffect, SideEffect};
+use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableCollection, SpawnableType}, game::effects::Ingridient};
+
+
 
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
 	fn build(&self, app: &mut App) {
 		app
+		.init_resource::<OccupiedSpawnSpace>()
 		.add_systems(
 			(
 				init_world,
@@ -23,13 +25,27 @@ impl Plugin for WorldPlugin {
 	}
 }
 
+#[derive(Component)]
+pub struct Tree;
+
+#[derive(Component)]
+pub struct Bush;
+
+#[derive(Component, Default, Debug)]
+struct SceneLoaded;
+
+#[derive(Resource, Default, Debug)]
+struct OccupiedSpawnSpace(Vec<(Vec2,f32)>);
+
 fn init_world(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut materials: ResMut<Assets<FoliageMaterial>>,
 	mut standard_mat: ResMut<Assets<StandardMaterial>>,
+	
 ) {
-	let plane_mesh = Mesh::from(shape::Plane { size: 600.0, subdivisions: 0 });
+	
+	let plane_mesh = Mesh::from(shape::Plane { size: 1.0, subdivisions: 0 });
 
 	// Plane
 	commands.spawn((
@@ -37,6 +53,7 @@ fn init_world(
 		Collider::from_bevy_mesh(&plane_mesh, &ComputedColliderShape::TriMesh).unwrap(),
 		MaterialMeshBundle::<FoliageMaterial> {
 			mesh: meshes.add(plane_mesh),
+			transform: Transform::from_scale(Vec3::splat(600.0)),
 			material: materials.add(FoliageMaterial {
 				color: Color::YELLOW_GREEN, //Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.5),
 				..default()
@@ -57,10 +74,54 @@ fn init_world(
 				base_color: Color::WHITE,
 				..default()
 			}),
-			transform: Transform::from_xyz(1.5, 5.0, 1.5).with_scale(Vec3::splat(3.0)),
+			//transform: Transform::from_xyz(1.5, 5.0, 1.5).with_scale(Vec3::splat(3.0)),
 			..default()
 		},
+		RenderLayers::layer(2),
 	));
+
+	// Inventory camera
+	commands.spawn((
+		Name::new("Inventory Camera"),
+		Camera3dBundle {
+			projection: Projection::Orthographic(OrthographicProjection {
+				scale: 1.0,
+				viewport_origin: Vec2::new(0.5,0.5),
+				scaling_mode: ScalingMode::FixedVertical(10.0),
+				..default()
+			}),
+			transform: Transform::from_translation(Vec3::Z * 100.0),
+			camera_3d: Camera3d {
+				clear_color: ClearColorConfig::None,
+				..default()
+			},
+			camera: Camera {
+				
+				order: 1,
+				..default()
+			},
+
+			..default()
+		},
+		RenderLayers::layer(2),
+		Fxaa::default(),
+	));
+
+	//let cube = meshes.add(Mesh::from(shape::Cube::new(1.0)));
+
+	// commands.spawn((
+	// 	Name::new("Backpack"),
+	// 	VisibilityBundle::default(),
+	// 	TransformBundle::default(),
+	// )).with_children(|commands| {
+	// 	commands.spawn((
+	// 		PbrBundle {
+	// 			mesh: cube.clone(),
+	// 			transform: 
+	// 			..default()
+	// 		},
+	// 	));
+	// });
 
 	// Light
 	commands.spawn(DirectionalLightBundle {
@@ -80,123 +141,136 @@ fn init_world(
 	});
 }
 
-#[derive(Component)]
-pub struct Tree;
+// enum VegetationType {
+// 	Tree,
+// 	Bush,
+// 	Mushroom,
+// }
+
+#[derive(Component, Clone, Copy)]
+struct Rare;
+
+
+#[derive(Component, Clone, Copy)]
+struct Shadow;
+
 
 fn spawn_vegetation(
-	mut command: Commands,
-    assets: Res<GameAssets>,
-    gltfs: Res<Assets<Gltf>>,
+	mut commands: Commands,
+	mut occupied_space: ResMut<OccupiedSpawnSpace>,
+	spawnables: Res<SpawnableCollection>,
 ) {
+	const SPAWN_SIZE: f32 = 200.0;
 
-	const SPAWN_SIZE: f32 = 300.0;
+	let mut rng = rand::thread_rng();
 
-	let mut occupied_space = vec![];
+	let weights = spawnables.0.iter().map(|s| s.spawn_weight ).enumerate().collect::<Vec<_>>();
+	let all_weights = weights.iter().fold(0.0, |acc, x| acc + x.1);
 
-	// Trees
-	let gltf = gltfs.get(&assets.tree_gltf).unwrap();
-	let mut rng = thread_rng();
+	let select_random_id = |rng: &mut ThreadRng| { 
+		let mut random_weight = rng.gen_range(0.0..all_weights); 
 
-	command.spawn((
-		Name::new("Tree Collection"),
+		for (i, weight) in weights.iter() {
+			random_weight -= weight;
+
+			if random_weight < 0.0 {
+				return *i;
+			}
+		}
+
+		weights.len() - 1
+	};
+
+	let collection = commands.spawn((
+		Name::new("Vegetation collection"),
 		TransformBundle::default(),
 		VisibilityBundle::default(),
-	)).with_children(|command| {
-		for i in 0..2500 {
-			let position = Vec2::new(rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE), rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE));
-		
-			if position.length_squared() < 6.0 && occupied_space.iter().any(|x| Vec2::length_squared(position - *x) < 80.0) {
-				continue;
-			}
+	)).id();
 
-			occupied_space.push(position);
+	for i in 0..10000 {
+		let spawnable = &spawnables.0[select_random_id(&mut rng)];
 
-			let scene = gltf.scenes[rng.gen_range(0..gltf.scenes.len())].clone();
-	
-			command.spawn((
-				Tree,
-				NotShadowReceiver,
-				Name::new(format!("Tree {i}")),
-				Collider::cylinder(4.0, 0.8),
-				SceneBundle {
-					scene,
-					transform: Transform::from_translation(position.extend(0.0).xzy()).with_scale(Vec3::splat(rng.gen_range(0.25..0.6))).with_rotation(Quat::from_rotation_y(rng.gen_range(-PI..PI))),
-					..default()
-				},
-			));
+		let position = Vec2::new(rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE), rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE));
+
+		let is_rare = rng.gen_bool(0.005);
+
+		let relative_scale = if is_rare {
+			rng.gen_range(1.0..2.0)
+		} else {
+			rng.gen_range(0.7..1.35)
+		};
+
+		if position.length_squared() < 12.0 || is_occupied(position, spawnable.size * relative_scale, &occupied_space) {
+			continue;
 		}
-	});
 
-	// Bushes
-	let gltf = gltfs.get(&assets.bush_gltf).unwrap();
+		// Set space as occupied
+		occupied_space.0.push((position, spawnable.size * relative_scale));
 
-	command.spawn((
-		Name::new("Bush Collection"),
-		TransformBundle::default(),
-		VisibilityBundle::default(),
-	)).with_children(|command| {
-		
-		for i in 0..2500 {
-			let position = Vec2::new(rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE), rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE));
-			if position.length_squared() < 6.0 && occupied_space.iter().any(|x| Vec2::length_squared(position - *x) < 45.0) {
-				continue;
-			}
+		let mut entity = commands.spawn((
+			SceneBundle {
+				scene: spawnable.scene.clone(),
+				transform: Transform::from_translation(Vec3::new(position.x,0.0,position.y))
+					.with_scale(Vec3::splat(relative_scale))
+					.with_rotation(Quat::from_rotation_y(rng.gen_range(-PI..PI))),
+				..default()
+			},
+		));
 
-			occupied_space.push(position);
-
-			let scene = gltf.scenes[rng.gen_range(0..gltf.scenes.len())].clone();
-	
-			command.spawn((
-				NotShadowReceiver,
-				Bush,
-				Name::new(format!("Bush {i}")),
-				SceneBundle {
-					scene,
-					transform: Transform::from_translation(position.extend(0.0).xzy()).with_scale(Vec3::splat(rng.gen_range(1.2..1.9))).with_rotation(Quat::from_rotation_y(rng.gen_range(-PI..PI))),
-					..default()
-				},
-			));
+		if is_rare {
+			entity.insert(Rare);
 		}
-	});
 
-	// Ingridients
-	let gltf = gltfs.get(&assets.ingridients_gltf).unwrap();
-
-	command.spawn((
-		Name::new("Ingridient Collection"),
-		TransformBundle::default(),
-		VisibilityBundle::default(),
-	)).with_children(|command| {
-
-		for i in 0..550 {
-			let position = Vec2::new(rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE), rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE));
-			if occupied_space.iter().any(|x| Vec2::length_squared(position - *x) < 20.0) {
-				continue;
-			}
-
-			occupied_space.push(position);
-
-			let scene = gltf.scenes[rng.gen_range(0..gltf.scenes.len())].clone();
-	
-			command.spawn((
-				Ingridient {
-					main_effect: MainEffect,
-					side_effect: SideEffect,
-				},
-				NotShadowReceiver,
-				Name::new(format!("Shroom {i}")),
-				SceneBundle {
-					scene,
-					transform: Transform::from_translation(position.extend(0.0).xzy()).with_scale(Vec3::splat(rng.gen_range(2.0..2.8))).with_rotation(Quat::from_rotation_y(rng.gen_range(-PI..PI))),
-					..default()
-				},
-			));
+		match spawnable.stype {
+    		SpawnableType::Tree => {
+				entity.insert((
+					Tree,
+					Name::new(format!("Tree {i}")),
+					Collider::cylinder(4.0, 0.7),
+				));
+			},
+    		SpawnableType::Bush => {
+				entity.insert((
+					Bush,
+					Name::new(format!("Bush {i}")),
+					Collider::cylinder(4.0, 0.2),
+				));
+			},
+    		SpawnableType::Mushroom => {
+				entity.insert((
+					Ingridient::default(),
+					Name::new(format!("Mushroom {i}")),
+					Collider::cylinder(4.0, 0.1),
+				));
+			},
 		}
-	});
+
+		// Add shadow to entity
+		entity.with_children(|commands| {
+			commands.spawn((
+				Name::new("Shadow"),
+				Shadow,
+				SHADOW_BUNDLE.get().unwrap().clone(),
+				Transform::from_xyz(0.0,0.02,0.0).with_scale(Vec3::splat(spawnable.size)),
+				GlobalTransform::default(),
+				VisibilityBundle::default(),
+			));
+		});
+
+		let entity = entity.id();
+		commands.entity(collection).add_child(entity);
+	}
+
+	fn is_occupied(position: Vec2, size: f32, occupied_space: &OccupiedSpawnSpace) -> bool {
+		occupied_space.0.iter().any(|(occupied_pos,occupied_size)| {
+			let distance = Vec2::length_squared(position - *occupied_pos);
+			
+			distance < (size * occupied_size)
+		})
+	}
 }
 
-#[derive(Component, Default, Debug)]
-struct SceneLoaded;
+
 
 #[allow(clippy::type_complexity)]
 fn init_loaded_scenes(
@@ -205,23 +279,24 @@ fn init_loaded_scenes(
 	mut material_assets: ResMut<Assets<FoliageMaterial>>,
 	name_query: Query<&Name, With<Handle<StandardMaterial>>>,
 	children_query: Query<&Children>,
-	tree_query: Query<(Entity,&SceneInstance),(Or<(With<Tree>, With<Bush>, With<Ingridient>)>, Or<(Without<SceneLoaded>, (With<SceneLoaded>, Changed<SceneInstance>))>)>
+	tree_query: Query<(Entity,&SceneInstance,Option<&Rare>),(Or<(With<Tree>, With<Bush>, With<Ingridient>)>, Or<(Without<SceneLoaded>, (With<SceneLoaded>, Changed<SceneInstance>))>)>
 ) {
 	let mut rng = thread_rng();
 
-	for (entity,scene) in &tree_query {
+	for (entity,scene,rare) in &tree_query {
 		if !scene_manager.instance_is_ready(**scene) {
 			continue;
 		}
 		commands.entity(entity).insert(SceneLoaded);
 
-		let is_rare = rng.gen_bool(0.0025); 
+		let is_rare = rare.is_some(); 
 
 		// Iterate by children names inside GLTF to set additional components/materials
 		// Probably really bad thing to do, but idk how to do it properly
 		for child in children_query.iter_descendants(entity) {
 			if let Ok(name) = name_query.get(child) {
 				match name.as_str() {
+
 					i if i.contains("Trunk") => {
 
 						const COLORS: &[Color] = &[
@@ -246,19 +321,22 @@ fn init_loaded_scenes(
 						.remove::<Handle<StandardMaterial>>()
 						.insert(bark_material.clone());
 					}
+
 					i if i.contains("Leaves") => {
 						const COLORS: &[Color] = &[
-							Color::GREEN,
+							//Color::GREEN,
 							Color::LIME_GREEN,
 							Color::YELLOW_GREEN,
 							Color::ORANGE,
 							Color::ORANGE_RED,
-							Color::RED,
+							//Color::RED,
 						];
 
 						let color = if is_rare {
 							Color::hsl(rng.gen_range(150.0..330.0), rng.gen_range(0.8..1.0), rng.gen_range(0.4..0.6))
 						} else {
+							//let t = 1.0 - rng.gen::<f32>().powf(2.0);
+							//Color::hsl(lerp(35.0..=100.0, t), rng.gen_range(0.75..0.90), rng.gen_range(0.45..0.5))
 							COLORS[rng.gen_range(0..(COLORS.len()))]
 						};
 
@@ -272,10 +350,15 @@ fn init_loaded_scenes(
 						.remove::<Handle<StandardMaterial>>()
 						.insert(leaves_material.clone());
 					}
+
 					i if i.contains("Cap") => {
-						// TODO: Remember material
+						let color = if is_rare {
+							Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.8..1.0), rng.gen_range(0.45..0.65))
+						} else {
+							Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.5..0.65), rng.gen_range(0.35..0.55))
+						};
 						let stem_material = material_assets.add(FoliageMaterial {
-							color: Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.8..1.0), rng.gen_range(0.4..0.6)),
+							color,
 							..default()
 						});
 
@@ -283,6 +366,7 @@ fn init_loaded_scenes(
 						.remove::<Handle<StandardMaterial>>()
 						.insert(stem_material.clone());
 					}
+
 					i if i.contains("Stem") => {
 						// TODO: Remember material
 						let stem_material = material_assets.add(FoliageMaterial {
@@ -300,13 +384,4 @@ fn init_loaded_scenes(
 		}
 
 	}
-}
-
-#[derive(Component)]
-pub struct Bush;
-
-#[derive(Debug, Clone, Copy, Component, Reflect)]
-pub struct Ingridient {
-	pub main_effect: MainEffect,
-	pub side_effect: SideEffect,
 }

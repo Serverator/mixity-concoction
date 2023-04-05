@@ -8,7 +8,7 @@ impl Plugin for CustomMaterialPlugin {
 	fn build(&self, app: &mut App) {
 		app
 			.add_plugin(MaterialPlugin::<FoliageMaterial>::default())
-			.add_system(set_dither_texture.in_schedule(OnExit(GameState::Loading)));
+			.add_system(set_dither_texture.in_schedule(OnExit(GameState::LoadingAssets)));
 	}
 }
 
@@ -75,6 +75,11 @@ impl Material for FoliageMaterial {
 	fn fragment_shader() -> ShaderRef {
 		"shaders/foliage.wgsl".into()
 	}
+
+	// TODO: Fix :)
+	//fn vertex_shader() -> ShaderRef {
+	//	"shaders/foliage.wgsl".into()
+	//}
 
 	fn alpha_mode(&self) -> AlphaMode {
 		AlphaMode::Opaque//Mask(0.5)

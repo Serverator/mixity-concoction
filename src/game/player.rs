@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::{core_pipeline::fxaa::Fxaa, math::Vec3Swizzles};
 
-use super::world::Ingridient;
+use super::effects::{Ingridient, ActiveEffects};
 
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
@@ -31,6 +31,8 @@ pub struct PlayerCamera;
 #[derive(Component, Clone, Debug, Default)]
 pub struct Inventory(Vec<Ingridient>);
 
+
+
 pub fn spawn_player(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
@@ -41,17 +43,18 @@ pub fn spawn_player(
 		Name::new("Player"),
 		Player,
 		Inventory::default(),
+		ActiveEffects::default(),
 		PbrBundle {
 			mesh: meshes.add(Mesh::from(
 				shape::Capsule 
 				{ 
-					radius: 0.6, 
-					depth: 1.8,
+					radius: 0.5, 
+					depth: 1.3,
 					..default() 
 				}
 			)),
 			material: materials.add(Color::rgb(0.8, 0.8, 0.8).into()),
-			transform: Transform::from_xyz(0.0, 1.5, 0.0),
+			transform: Transform::from_xyz(0.0, 0.9, 0.0),
 			..default()
 		}, 
 		// Inputs
@@ -60,19 +63,24 @@ pub fn spawn_player(
 		// Rapier physics components
 		RigidBody::KinematicVelocityBased,
 		KinematicCharacterController::default(),
-		Collider::capsule(-Vec3::Y * 0.9, Vec3::Y * 0.9, 0.6),
+		Collider::capsule(-Vec3::Y * 0.4, Vec3::Y * 0.4, 0.5),
 		Ccd::enabled(),
 		Velocity::default(),
 		Friction::new(0.0),
 		Restitution::new(0.0),
-	)).with_children(|parent| {
+	)).with_children(|command| {
 		// Camera
-		parent.spawn((
+		command.spawn((
 			PlayerCamera,
-			Camera3dBundle::default(),
+			Camera3dBundle {
+				camera: Camera {
+					hdr: false,
+					..default()
+				},
+				..default()
+			},
 			Fxaa::default(),
 		));
-
 	});
 }
 
@@ -85,13 +93,11 @@ impl Default for CameraDistance {
 }
 
 pub fn move_player(
-	mut player_query: Query<(&Transform, &mut KinematicCharacterController, &ActionState<Action>), With<Player>>,
+	mut player_query: Query<(&mut KinematicCharacterController, &ActionState<Action>), With<Player>>,
 	cam_query: Query<&Transform, (With<PlayerCamera>, Without<Player>)>,
 	time: Res<Time>,
-	#[cfg(debug_assertions)]
-	mut lines: ResMut<DebugLines>,
 ) {
-	let (Ok((_transform, mut controller,input)), Ok(camera_transform)) = (player_query.get_single_mut(),cam_query.get_single()) else {
+	let (Ok((mut controller, input)), Ok(camera_transform)) = (player_query.get_single_mut(),cam_query.get_single()) else {
 		return;
 	};
 
@@ -101,10 +107,7 @@ pub fn move_player(
 
 		let (y_rot,_,_) = camera_transform.rotation.to_euler(EulerRot::YXZ);
 
-		#[cfg(debug_assertions)]
-		lines.line(_transform.translation, _transform.translation + Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * 2.0, 0.0);
-		
-		controller.translation = Some(Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * time.delta_seconds() * 14.0); 
+		controller.translation = Some(Quat::from_rotation_y(y_rot) * movement_input.extend(0.0).xzy() * time.delta_seconds() * 9.0); 
 	};
 
 }
@@ -129,7 +132,7 @@ pub fn pickup_entity(
 		}).min_by(|(dist_a,_,_),(dist_b,_,_)| dist_a.total_cmp(dist_b));
 
 		if let Some((_,ingr_entity,ingridient)) = closest_ingridient {
-			inventory.0.push(**ingridient);
+			inventory.0.push((*ingridient).clone());
 			commands.entity(*ingr_entity).despawn_recursive();
 		}
 	}
@@ -172,7 +175,7 @@ pub fn camera_follow(
 	}
 
 	camera_transform.rotation = Quat::from_euler(EulerRot::YXZ, y_rot, lerp(-PI/6.2,-PI/4.0,distance.0.powi(2)), 0.0);
-	camera_transform.translation = camera_transform.back() * lerp(15.0, 50.0, distance.0.powi(2));
+	camera_transform.translation = camera_transform.back() * lerp(8.0, 30.0, distance.0.powi(2));
 
 	fn lerp(from: f32, to: f32, t: f32) -> f32 {
 		t * to + from * (1.0 - t)

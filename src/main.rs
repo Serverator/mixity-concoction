@@ -38,7 +38,7 @@ fn main() {
 #[derive(States, Default, Debug, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum GameState {
 	#[default]
-	Loading,
+	LoadingAssets,
 	MainMenu,
 	InGame,
 }
@@ -49,6 +49,7 @@ pub mod prelude {
 	pub use leafwing_input_manager::prelude::*;
 	pub use rand::prelude::*;
 	pub use std::f32::consts::PI;
+	pub use smallvec::SmallVec;
 
 	pub use crate::assets::GameAssets;
 	pub use crate::game::input::*;

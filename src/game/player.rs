@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::{core_pipeline::fxaa::Fxaa, math::Vec3Swizzles};
+use bevy::{core_pipeline::fxaa::Fxaa, math::Vec3Swizzles, render::view::RenderLayers};
 
 use super::effects::{Ingridient, ActiveEffects};
 
@@ -29,7 +29,7 @@ pub struct Player;
 pub struct PlayerCamera;
 
 #[derive(Component, Clone, Debug, Default)]
-pub struct Inventory(Vec<Ingridient>);
+pub struct Inventory(Vec<Entity>);
 
 
 
@@ -62,7 +62,10 @@ pub fn spawn_player(
 
 		// Rapier physics components
 		RigidBody::KinematicVelocityBased,
-		KinematicCharacterController::default(),
+		KinematicCharacterController {
+			filter_groups: Some(CollisionGroups::new(Group::GROUP_1,Group::GROUP_1)),
+			..default()
+		},
 		Collider::capsule(-Vec3::Y * 0.4, Vec3::Y * 0.4, 0.5),
 		Ccd::enabled(),
 		Velocity::default(),
@@ -112,28 +115,70 @@ pub fn move_player(
 
 }
 
+#[allow(clippy::type_complexity)]
 pub fn pickup_entity(
 	mut commands: Commands,
 	mut player_query: Query<(&Transform, &ActionState<Action>, &mut Inventory), With<Player>>,
-	ingridient_query: Query<(Entity, &Transform, &Ingridient)>,
+	mut ingridient_query: Query<(Entity, &mut Transform), (With<Ingridient>,Without<Player>)>,
+	mut finder_query: Query<&Name>,
+	mut child_query: Query<&Children>,
 ) {
 	let Ok((player_transform, input, mut inventory)) = player_query.get_single_mut() else {
 		return;
 	};
 
 	if input.just_pressed(Action::Use) {
-		let closest_ingridient = &ingridient_query.iter().filter_map(|(entity,ingr_transform,ingridient)| {
+		let closest_ingridient = &ingridient_query.iter().filter_map(|(entity,ingr_transform)| {
 			let distance_sq = (ingr_transform.translation - player_transform.translation).length_squared();
-			if distance_sq < 10.0 {
-				Some((distance_sq, entity, ingridient))
+			if distance_sq < 5.0 {
+				Some((distance_sq, entity))
 			} else {
 				None
 			}
-		}).min_by(|(dist_a,_,_),(dist_b,_,_)| dist_a.total_cmp(dist_b));
+		}).min_by(|(dist_a,_),(dist_b,_)| dist_a.total_cmp(dist_b));
 
-		if let Some((_,ingr_entity,ingridient)) = closest_ingridient {
-			inventory.0.push((*ingridient).clone());
-			commands.entity(*ingr_entity).despawn_recursive();
+		if let &Some((_,ingr_entity)) = closest_ingridient {
+			inventory.0.push(ingr_entity);
+
+			let mut transform = ingridient_query.get_mut(ingr_entity).unwrap().1;
+
+			transform.translation = Vec3::new(0.0,0.0,0.0);
+
+			dbg!(finder_query.get(ingr_entity).unwrap());
+
+			let mut entity = commands.entity(ingr_entity);
+
+			entity.remove::<Collider>();
+
+			entity.remove_parent();
+
+			entity.insert((
+				RigidBody::Dynamic,
+				Sleeping {
+					sleeping: false,
+					..default()
+				},
+				Velocity::default(),
+				Collider::ball(0.5),
+				ColliderMassProperties::MassProperties(
+					MassProperties {
+						mass: 2.0,
+						..default()
+					}
+				),
+				RenderLayers::layer(2),
+				CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+				SolverGroups::new(Group::GROUP_2,Group::GROUP_2),
+			));
+
+			for child in child_query.iter_descendants(entity.id()) {
+				let mut child = commands.entity(child);
+
+				child.insert((
+					RenderLayers::layer(2),
+				));
+			}
+
 		}
 	}
 }

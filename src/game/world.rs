@@ -63,22 +63,32 @@ fn init_world(
 		RigidBody::Fixed,
 	));
 
-	// // sphere
-	// commands.spawn((
-	// 	PbrBundle {
-	// 		mesh: meshes.add(Mesh::from(shape::UVSphere {
-	// 			radius: 0.5,
-	// 			..default()
-	// 		})),
-	// 		material: standard_mat.add(StandardMaterial {
-	// 			base_color: Color::WHITE,
-	// 			..default()
-	// 		}),
-	// 		//transform: Transform::from_xyz(1.5, 5.0, 1.5).with_scale(Vec3::splat(3.0)),
-	// 		..default()
-	// 	},
-	// 	RenderLayers::layer(2),
-	// ));
+	// sphere
+	commands.spawn((
+		Name::new("Ball"),
+		PbrBundle {
+			mesh: meshes.add(Mesh::from(shape::UVSphere {
+				radius: 0.4,
+				..default()
+			})),
+			material: standard_mat.add(StandardMaterial {
+				base_color: Color::WHITE,
+				..default()
+			}),
+			transform: Transform::from_xyz(1.5, 5.0, 1.5),//.with_scale(Vec3::splat(3.0)),
+			..default()
+		},
+		RigidBody::Dynamic,
+		//Velocity::default(),
+		Collider::ball(0.4),
+		ColliderMassProperties::Density(0.05),
+		Restitution::new(0.70),
+		GravityScale(1.3),
+		Friction::new(0.2),
+		//RenderLayers::layer(2),
+		CollisionGroups::new(Group::GROUP_1,Group::GROUP_1),
+		SolverGroups::new(Group::GROUP_1,Group::GROUP_1),
+	));
 
 	// Inventory camera
 	commands.spawn((
@@ -107,21 +117,71 @@ fn init_world(
 		Fxaa::default(),
 	));
 
-	//let cube = meshes.add(Mesh::from(shape::Cube::new(1.0)));
+	let cube = meshes.add(Mesh::from(shape::Cube::new(1.0)));
 
-	// commands.spawn((
-	// 	Name::new("Backpack"),
-	// 	VisibilityBundle::default(),
-	// 	TransformBundle::default(),
-	// )).with_children(|commands| {
-	// 	commands.spawn((
-	// 		PbrBundle {
-	// 			mesh: cube.clone(),
-	// 			transform: 
-	// 			..default()
-	// 		},
-	// 	));
-	// });
+	commands.spawn((
+		Name::new("Backpack"),
+		RigidBody::Fixed,
+		VisibilityBundle::default(),
+		TransformBundle::from_transform(Transform::from_xyz(-5.0, 0.0, 0.0)),
+		RenderLayers::layer(2),
+		CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+	)).with_children(|commands| {
+		commands.spawn((
+			PbrBundle {
+				mesh: cube.clone(),
+				transform: Transform::from_translation(Vec3::NEG_Y).with_scale(Vec3::new(2.5,0.2,2.0)),
+				..default()
+			},
+			Collider::cuboid(0.5,0.5,0.5),
+			RenderLayers::layer(2),
+			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+		));
+
+		commands.spawn((
+			PbrBundle {
+				mesh: cube.clone(),
+				transform: Transform::from_translation(Vec3::new(-1.25,0.5,0.0)).with_scale(Vec3::new(0.2,3.0,2.0)),
+				..default()
+			},
+			Collider::cuboid(0.5,0.5,0.5),
+			RenderLayers::layer(2),
+			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+		));
+
+		commands.spawn((
+			PbrBundle {
+				mesh: cube.clone(),
+				transform: Transform::from_translation(Vec3::new(1.25,0.5,0.0)).with_scale(Vec3::new(0.2,3.0,2.0)),
+				..default()
+			},
+			Collider::cuboid(0.5,0.5,0.5),
+			RenderLayers::layer(2),
+			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+		));
+
+		commands.spawn((
+			PbrBundle {
+				mesh: cube.clone(),
+				transform: Transform::from_translation(Vec3::new(0.0,0.5,-1.25)).with_scale(Vec3::new(2.5,3.0,0.2)),
+				material: standard_mat.add(StandardMaterial {
+						base_color: Color::WHITE,
+						..default()
+					}),
+				..default()
+			},
+			Collider::cuboid(0.5,0.5,0.5),
+			RenderLayers::layer(2),
+			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+		));
+
+		commands.spawn((
+			Transform::from_translation(Vec3::new(0.0,0.5,1.25)).with_scale(Vec3::new(2.5,3.0,0.2)),
+			Collider::cuboid(0.5,0.5,0.5),
+			RenderLayers::layer(2),
+			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+		));
+	});
 
 	// Light
 	commands.spawn(DirectionalLightBundle {

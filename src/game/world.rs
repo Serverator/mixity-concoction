@@ -1,4 +1,4 @@
-use bevy::{scene::SceneInstance, render::{view::RenderLayers, camera::ScalingMode}, core_pipeline::{fxaa::Fxaa, clear_color::ClearColorConfig}};
+use bevy::{math::Vec3Swizzles, scene::SceneInstance, gltf::Gltf, pbr::NotShadowReceiver, render::{view::RenderLayers, once_cell::sync::OnceCell, camera::ScalingMode}, ecs::system::EntityCommands, core_pipeline::{fxaa::Fxaa, clear_color::ClearColorConfig}};
 
 
 use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableCollection, SpawnableType}, game::effects::Ingridient};
@@ -63,22 +63,22 @@ fn init_world(
 		RigidBody::Fixed,
 	));
 
-	// sphere
-	commands.spawn((
-		PbrBundle {
-			mesh: meshes.add(Mesh::from(shape::UVSphere {
-				radius: 0.5,
-				..default()
-			})),
-			material: standard_mat.add(StandardMaterial {
-				base_color: Color::WHITE,
-				..default()
-			}),
-			//transform: Transform::from_xyz(1.5, 5.0, 1.5).with_scale(Vec3::splat(3.0)),
-			..default()
-		},
-		RenderLayers::layer(2),
-	));
+	// // sphere
+	// commands.spawn((
+	// 	PbrBundle {
+	// 		mesh: meshes.add(Mesh::from(shape::UVSphere {
+	// 			radius: 0.5,
+	// 			..default()
+	// 		})),
+	// 		material: standard_mat.add(StandardMaterial {
+	// 			base_color: Color::WHITE,
+	// 			..default()
+	// 		}),
+	// 		//transform: Transform::from_xyz(1.5, 5.0, 1.5).with_scale(Vec3::splat(3.0)),
+	// 		..default()
+	// 	},
+	// 	RenderLayers::layer(2),
+	// ));
 
 	// Inventory camera
 	commands.spawn((

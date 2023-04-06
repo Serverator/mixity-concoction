@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::{core_pipeline::fxaa::Fxaa, math::Vec3Swizzles, render::view::RenderLayers};
 
-use super::effects::{Ingridient, ActiveEffects};
+use super::effects::{Ingredient, ActiveEffects};
 
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
@@ -118,7 +118,7 @@ pub fn move_player(
 pub fn pickup_entity(
 	mut commands: Commands,
 	mut player_query: Query<(&Transform, &ActionState<Action>, &mut Inventory), With<Player>>,
-	mut ingridient_query: Query<(Entity, &mut Transform), (With<Ingridient>,Without<Player>)>,
+	mut ingredient_query: Query<(Entity, &mut Transform), (With<Ingredient>,Without<Player>)>,
 	finder_query: Query<&Name>,
 	child_query: Query<&Children>,
 ) {
@@ -127,7 +127,7 @@ pub fn pickup_entity(
 	};
 
 	if input.just_pressed(Action::Use) {
-		let closest_ingridient = &ingridient_query.iter().filter_map(|(entity,ingr_transform)| {
+		let closest_ingredient = &ingredient_query.iter().filter_map(|(entity,ingr_transform)| {
 			let distance_sq = (ingr_transform.translation - player_transform.translation).length_squared();
 			if distance_sq < 5.0 {
 				Some((distance_sq, entity))
@@ -136,10 +136,10 @@ pub fn pickup_entity(
 			}
 		}).min_by(|(dist_a,_),(dist_b,_)| dist_a.total_cmp(dist_b));
 
-		if let &Some((_,ingr_entity)) = closest_ingridient {
+		if let &Some((_,ingr_entity)) = closest_ingredient {
 			inventory.0.push(ingr_entity);
 
-			let mut transform = ingridient_query.get_mut(ingr_entity).unwrap().1;
+			let mut transform = ingredient_query.get_mut(ingr_entity).unwrap().1;
 
 			transform.translation = Vec3::new(0.0,0.0,0.0);
 

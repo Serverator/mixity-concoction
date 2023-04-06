@@ -1,4 +1,4 @@
-use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, Spawnable}, game::effects::{Ingridient, IngridientType}};
+use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, Spawnable}, game::effects::{Ingredient, IngredientType}};
 
 pub struct WorldPlugin;
 
@@ -180,7 +180,7 @@ fn spawn_spawnables(
 			},
     		SpawnableArchetype::Mushroom => {
 				entity.insert((
-					Ingridient::generate_random_ingridient(&mut rng, IngridientType::Mushroom, is_rare),
+					Ingredient::generate_random_ingredient(&mut rng, IngredientType::Mushroom, is_rare),
 					Name::new(format!("Mushroom {i}")),
 					Collider::cylinder(4.0, 0.1),
 				));

@@ -6,7 +6,7 @@ pub mod physics;
 pub mod input;
 pub mod materials;
 pub mod effects;
-pub mod ingridient;
+pub mod ingredient;
 pub mod backpack;
 
 pub struct GamePlugin;

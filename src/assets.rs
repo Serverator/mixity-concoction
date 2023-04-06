@@ -52,7 +52,7 @@ fn setup(
             id: i,
             archetype: SpawnableArchetype::Tree,
             scene: tree.clone(),
-            ingridient: None,
+            ingredient: None,
             spawn_weight: 1.5 / tree_scenes.len() as f32,
             size: 2.8
         };
@@ -65,7 +65,7 @@ fn setup(
             id: i,
             archetype: SpawnableArchetype::Bush,
             scene: scene.clone(),
-            ingridient: None,
+            ingredient: None,
             spawn_weight: 1.0 / tree_scenes.len() as f32,
             size: match i {
                 1 => 2.0,
@@ -75,17 +75,17 @@ fn setup(
         spawnable_assets.add(spawnable);
     }
 
-    let ingridient_scenes = &gltfs.get(&assets.ingridients_gltf).unwrap().scenes;
-    for (i,scene) in ingridient_scenes.iter().enumerate() {
+    let ingredient_scenes = &gltfs.get(&assets.ingredients_gltf).unwrap().scenes;
+    for (i,scene) in ingredient_scenes.iter().enumerate() {
         let spawnable = Spawnable {
             id: i,
             archetype: SpawnableArchetype::Mushroom,
             scene: scene.clone(),
-            ingridient: Some(SpawnableIngridient { 
+            ingredient: Some(SpawnableIngredient { 
                 pick_event: PickUpEvent::Destroy,
                 inventory_scene: scene.clone(),
             }),
-            spawn_weight: 0.5 / ingridient_scenes.len() as f32,
+            spawn_weight: 0.5 / ingredient_scenes.len() as f32,
             size: 0.6
         };
         spawnable_assets.add(spawnable);
@@ -93,7 +93,7 @@ fn setup(
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
-pub struct SpawnableIngridient {
+pub struct SpawnableIngredient {
     pick_event: PickUpEvent,
     inventory_scene: Handle<Scene>,
 }
@@ -116,7 +116,7 @@ pub struct Spawnable {
     pub id: usize,
     pub archetype: SpawnableArchetype,
     pub scene: Handle<Scene>,
-    pub ingridient: Option<SpawnableIngridient>,
+    pub ingredient: Option<SpawnableIngredient>,
     pub spawn_weight: f32,
     pub size: f32,
 }
@@ -152,8 +152,8 @@ pub struct GameAssets {
     pub tree_gltf: Handle<Gltf>,
     #[asset(path = "models/bush.gltf")]
     pub bush_gltf: Handle<Gltf>,
-    #[asset(path = "models/ingridients.gltf")]
-    pub ingridients_gltf: Handle<Gltf>,
+    #[asset(path = "models/ingredients.gltf")]
+    pub ingredients_gltf: Handle<Gltf>,
 }
 
 #[derive(Component)]

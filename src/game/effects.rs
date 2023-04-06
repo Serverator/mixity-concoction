@@ -18,39 +18,39 @@ pub struct ActiveEffect {
 pub struct ActiveEffects(pub Vec<ActiveEffect>);
 
 #[derive(Debug, Clone, Component, Default)]
-pub struct Ingridient {
-	pub ingridient_type: IngridientType,
+pub struct Ingredient {
+	pub ingredient_type: IngredientType,
 	pub name: String,
 	pub is_rare: bool,
-	pub effects: SmallVec<[IngridientEffect;4]>,
+	pub effects: SmallVec<[IngredientEffect;4]>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct IngridientEffect {
+pub struct IngredientEffect {
 	pub effect_type: Effect,
 	pub duration: f32,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-// TODO_OLEG: Add more ingridient types
-pub enum IngridientType {
+// TODO_OLEG: Add more ingredient types
+pub enum IngredientType {
 	#[default]
 	Plant,
 	Mushroom,
 	Berry,
 }
 
-impl Ingridient {
+impl Ingredient {
 	#[allow(dead_code)]
-	// TODO_OLEG: Generate random ingridients
-	pub fn generate_random_ingridient(rng: &mut impl Rng, ingridient_type: IngridientType, is_rare: bool) -> Self {
+	// TODO_OLEG: Generate random ingredients
+	pub fn generate_random_ingredient(rng: &mut impl Rng, ingredient_type: IngredientType, is_rare: bool) -> Self {
 
 		let name;
 		let effects;
 
-		match ingridient_type {
-    		IngridientType::Mushroom => {
+		match ingredient_type {
+    		IngredientType::Mushroom => {
 				const NAME_1: &[&str] = &["Smelly", "Witches"];
 				const NAME_2: &[&str] = &["Toe"];
 
@@ -58,15 +58,15 @@ impl Ingridient {
 				effects = SmallVec::new();
 			},
 			// More types here...
-			IngridientType::Berry => todo!(),
-			IngridientType::Plant => todo!(),
+			IngredientType::Berry => todo!(),
+			IngredientType::Plant => todo!(),
 		}
 		
-		Ingridient { 
+		Ingredient { 
 			name, 
 			effects, 
 			is_rare,
-			ingridient_type,
+			ingredient_type,
 		}
 	}
 }

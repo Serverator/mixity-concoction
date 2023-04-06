@@ -1,4 +1,4 @@
-use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, SceneInstanceReady, Spawnable}, game::effects::{Ingridient, IngridientType}};
+use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, Spawnable}, game::effects::{Ingridient, IngridientType}};
 
 pub struct WorldPlugin;
 
@@ -10,11 +10,11 @@ impl Plugin for WorldPlugin {
 			init_world,
 			spawn_spawnables,
 				).in_schedule(OnEnter(GameState::InGame))
-		)
-		.add_systems((
-			set_materials_to_spawnables,
-				).in_set(OnUpdate(GameState::InGame))
 		);
+		// .add_systems((
+		// 	set_materials_to_spawnables,
+		// 		).in_set(OnUpdate(GameState::InGame))
+		// );
 	}
 }
 
@@ -114,24 +114,9 @@ fn spawn_spawnables(
 	let mut rng = rand::thread_rng();
 
 	let spawnables = spawnable_assets.iter().collect::<Vec<_>>();
-	let all_weights = spawnables.iter().fold(0.0, |acc, x| acc + x.1.spawn_weight);
+	let weights = spawnables.iter().map(|s| s.1.spawn_weight).collect::<Vec<_>>();
 
-	let get_random_spawnable = |rng: &mut ThreadRng| { 
-		let mut random_weight = rng.gen_range(0.0..all_weights); 
-
-		let mut last_spawnable = None;
-
-		for spawnable in spawnables.iter() {
-			last_spawnable = Some(*spawnable);
-			random_weight -= spawnable.1.spawn_weight;
-
-			if random_weight <= 0.0 {
-				break;
-			}
-		}
-
-		last_spawnable
-	};
+	let choose_spawnable = Choices { choices: &spawnables, weights: Some(&weights) };
 
 	let collection = commands.spawn((
 		Name::new("Vegetation collection"),
@@ -140,7 +125,7 @@ fn spawn_spawnables(
 	)).id();
 
 	for i in 0..10000 {
-		let Some((spawnable_handle,spawnable)) = get_random_spawnable(&mut rng) else {
+		let Some((spawnable_handle,spawnable)) = choose_spawnable.get_random(&mut rng) else {
 			warn!("Couldn't randomly choose spawnable from assets!");
 			continue;
 		};
@@ -164,7 +149,7 @@ fn spawn_spawnables(
 
 		let mut entity = commands.spawn((
 			SpawnableInstance {
-				handle: Handle::<Spawnable>::weak(spawnable_handle),
+				handle: Handle::<Spawnable>::weak(*spawnable_handle),
 				rare: is_rare,
 				//archetype: spawnable.archetype,
 			},
@@ -176,6 +161,8 @@ fn spawn_spawnables(
 				..default()
 			},
 			CollisionGroups::new(Group::GROUP_1,Group::GROUP_1),
+			// Applies materials to the spawned scene
+			NamedMaterials::generate_materials(spawnable.archetype, is_rare, &mut rng),
 		));
 
 		match spawnable.archetype {
@@ -222,106 +209,5 @@ fn spawn_spawnables(
 			
 			distance < (size * occupied_size)
 		})
-	}
-}
-
-/// Set materials for loaded scene instances
-#[allow(clippy::type_complexity)]
-fn set_materials_to_spawnables(
-	mut commands: Commands,
-	mut material_assets: ResMut<Assets<FoliageMaterial>>,
-	name_query: Query<&Name, (With<Handle<StandardMaterial>>, Without<Shadow>)>,
-	children_query: Query<&Children>,
-	vegetation_query: Query<(Entity, &SpawnableInstance), Added<SceneInstanceReady>>,
-) {
-	let mut rng = thread_rng();
-
-	for (entity, vegetation) in &vegetation_query {
-		let is_rare = vegetation.rare; 
-
-		// Iterate by children names inside GLTF to set additional components/materials
-		// Probably really bad thing to do, but idk how to do it properly
-		for (child, name) in children_query.iter_descendants(entity).filter_map(|child| name_query.get(child).map(|name| (child, name)).ok()) {
-			let material = match name.as_str() {
-
-				// Set material to Trunk
-				i if i.contains("Trunk") => {
-					const TRUNK_COLORS: &[Color] = &[
-						Color::rgb(0.5, 0.3, 0.05),
-						Color::rgb(0.55, 0.35, 0.05),
-						Color::rgb(0.45, 0.25, 0.05),
-					];
-
-					let color = if is_rare {
-						Color::rgb(0.85, 0.85, 0.9)
-					} else {
-						TRUNK_COLORS[rng.gen_range(0..(TRUNK_COLORS.len()))]
-					};
-
-					// TODO: Remember material
-					material_assets.add(FoliageMaterial {
-						color,
-						..default()
-					})
-				}
-
-				// Set material to leaves
-				i if i.contains("Leaves") => {
-					const LEAVES_COLORS: &[Color] = &[
-						Color::LIME_GREEN,
-						Color::YELLOW_GREEN,
-						Color::ORANGE,
-						Color::ORANGE_RED,
-					];
-
-					let color = if is_rare {
-						Color::hsl(rng.gen_range(150.0..330.0), rng.gen_range(0.8..1.0), rng.gen_range(0.4..0.6))
-					} else {
-						LEAVES_COLORS[rng.gen_range(0..(LEAVES_COLORS.len()))]
-					};
-
-					material_assets.add(FoliageMaterial {
-						color,
-						sss: true,
-						..default()
-					})
-				}
-
-				// Set material to mushroom caps
-				i if i.contains("Cap") => {
-					let color = if is_rare {
-						Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.8..1.0), rng.gen_range(0.45..0.65))
-					} else {
-						Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.5..0.65), rng.gen_range(0.35..0.55))
-					};
-
-					material_assets.add(FoliageMaterial {
-						color,
-						..default()
-					})
-				}
-
-
-				i if i.contains("Stem") => {
-					// TODO: Remember material
-					material_assets.add(FoliageMaterial {
-						color: Color::rgb(0.8, 0.8, 0.8), //Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.5),
-						..default()
-					})
-				}
-
-				// Set as no texture maretial
-				_ => { 
-					material_assets.add(FoliageMaterial {
-						color: Color::PINK,
-						..default()
-					})
-				}
-			};
-
-			commands.entity(child)
-				.remove::<Handle<StandardMaterial>>()
-				.insert(material.clone());
-		}
 	}
 }

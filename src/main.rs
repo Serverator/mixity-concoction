@@ -5,6 +5,7 @@ use crate::prelude::*;
 mod assets;
 mod game;
 mod main_menu;
+mod helper;
 
 #[cfg(debug_assertions)]
 mod debug;
@@ -53,7 +54,8 @@ pub mod prelude {
 	pub use rand::prelude::*;
 	pub use std::f32::consts::PI;
 	pub use smallvec::SmallVec;
-
+	
+	pub use crate::helper::*;
 	pub use crate::assets::GameAssets;
 	pub use crate::game::input::*;
 	pub use crate::game::materials::*;

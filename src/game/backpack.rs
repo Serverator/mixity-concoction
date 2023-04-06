@@ -63,7 +63,6 @@ fn spawn(
 		//SolverGroups::new(Group::GROUP_2,Group::GROUP_2),
 	)).with_children(|commands| {
 		commands.spawn((
-			ColliderDisabled,
 			Collider::ball(0.3),
 			Transform::from_translation(Vec3::Y * 0.25),
 			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),

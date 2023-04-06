@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::{gltf::Gltf, render::{once_cell::sync::OnceCell, view::RenderLayers}, scene::SceneInstance, reflect::TypeUuid};
+use bevy::{gltf::Gltf, render::{once_cell::sync::OnceCell, view::RenderLayers}, scene::{SceneInstance}, reflect::TypeUuid};
 pub use bevy_asset_loader::prelude::*;
 use bevy::ecs::query::ReadOnlyWorldQuery;
 
@@ -44,10 +44,12 @@ fn setup(
 	});
 
 	SHADOW_BUNDLE.set((shadow_material,plane_mesh)).unwrap();
-    
+
     let tree_scenes = &gltfs.get(&assets.tree_gltf).unwrap().scenes;
-    for (_i,tree) in tree_scenes.iter().enumerate() {
+    
+    for (i,tree) in tree_scenes.iter().enumerate() {
         let spawnable = Spawnable {
+            id: i,
             archetype: SpawnableArchetype::Tree,
             scene: tree.clone(),
             ingridient: None,
@@ -60,6 +62,7 @@ fn setup(
     let bush_scenes = &gltfs.get(&assets.bush_gltf).unwrap().scenes;
     for (i,scene) in bush_scenes.iter().enumerate() {
         let spawnable = Spawnable {
+            id: i,
             archetype: SpawnableArchetype::Bush,
             scene: scene.clone(),
             ingridient: None,
@@ -73,8 +76,9 @@ fn setup(
     }
 
     let ingridient_scenes = &gltfs.get(&assets.ingridients_gltf).unwrap().scenes;
-    for (_i,scene) in ingridient_scenes.iter().enumerate() {
+    for (i,scene) in ingridient_scenes.iter().enumerate() {
         let spawnable = Spawnable {
+            id: i,
             archetype: SpawnableArchetype::Mushroom,
             scene: scene.clone(),
             ingridient: Some(SpawnableIngridient { 
@@ -88,43 +92,55 @@ fn setup(
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct SpawnableIngridient {
     pick_event: PickUpEvent,
     inventory_scene: Handle<Scene>,
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub enum PickUpEvent {
+    #[default]
+    /// Destroys the original entity entirely
     Destroy,
-    Replace(Handle<Scene>),
+    /// Removes a child with specified name
+    RemoveNamedChild(&'static str),
+    // TODO: Make it happen, but not now
+    //Replace(Handle<Scene>),
 }
 
-#[derive(Clone, Debug, TypeUuid, PartialEq)]
+#[derive(TypeUuid)]
 #[uuid = "2e680e06-a271-4804-8f5a-73927db8dec4"]
 pub struct Spawnable {
-    pub scene: Handle<Scene>,
+    pub id: usize,
     pub archetype: SpawnableArchetype,
+    pub scene: Handle<Scene>,
     pub ingridient: Option<SpawnableIngridient>,
     pub spawn_weight: f32,
     pub size: f32,
 }
 
-// Use hash from Scene handle. Each scene handle SHOULD have only one spawnable.
-impl std::hash::Hash for Spawnable {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.scene.hash(state);
+impl PartialEq for Spawnable {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id && self.archetype == other.archetype
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+// Use hash from Scene handle. Each scene handle SHOULD have only one spawnable.
+impl std::hash::Hash for Spawnable {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.archetype.hash(state);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SpawnableArchetype {
     Tree,
     Bush,
     Mushroom,
 }
-
 
 #[derive(AssetCollection, Resource)]
 pub struct GameAssets {

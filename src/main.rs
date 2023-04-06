@@ -1,3 +1,5 @@
+use bevy::window::WindowResolution;
+
 use crate::prelude::*;
 
 mod assets;
@@ -21,6 +23,7 @@ fn main() {
 					primary_window: Some(Window {
 						title: "Project Concoction".to_string(),
 						present_mode: bevy::window::PresentMode::Immediate,
+						resolution: WindowResolution::new(600.0, 350.0),
 						..default()
 					}),
 					..default()

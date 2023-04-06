@@ -6,6 +6,8 @@ pub mod physics;
 pub mod input;
 pub mod materials;
 pub mod effects;
+pub mod ingridient;
+pub mod backpack;
 
 pub struct GamePlugin;
 
@@ -16,6 +18,7 @@ impl Plugin for GamePlugin {
 			.add_plugin(world::WorldPlugin)
 			.add_plugin(physics::PhysicsPlugin)
 			.add_plugin(input::InputPlugin)
-			.add_plugin(materials::CustomMaterialPlugin);
+			.add_plugin(materials::CustomMaterialPlugin)
+			.add_plugin(backpack::BackpackPlugin);
 	}
 }

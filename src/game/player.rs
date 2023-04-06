@@ -31,8 +31,6 @@ pub struct PlayerCamera;
 #[derive(Component, Clone, Debug, Default)]
 pub struct Inventory(Vec<Entity>);
 
-
-
 pub fn spawn_player(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
@@ -62,6 +60,7 @@ pub fn spawn_player(
 
 		// Rapier physics components
 		RigidBody::KinematicVelocityBased,
+		CollisionGroups::new(Group::GROUP_1,Group::GROUP_1),
 		KinematicCharacterController {
 			filter_groups: Some(CollisionGroups::new(Group::GROUP_1,Group::GROUP_1)),
 			..default()

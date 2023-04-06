@@ -6,12 +6,14 @@ pub enum Effect {
 	MaterialVision,
 }
 
+/// Effects and time left for them to wear off
 #[derive(Clone, Copy, Debug)]
 pub struct ActiveEffect {
 	pub effect: Effect,
 	pub time_left: f32, 
 }
 
+/// Added to the player to determine active effects
 #[derive(Component, Clone, Debug, Default)]
 pub struct ActiveEffects(pub Vec<ActiveEffect>);
 
@@ -23,9 +25,15 @@ pub struct Ingridient {
 	pub effects: SmallVec<[IngridientEffect;4]>,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub struct IngridientEffect {
+	pub effect_type: Effect,
+	pub duration: f32,
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-// TODO_OLEG: Add more ingridient type
+// TODO_OLEG: Add more ingridient types
 pub enum IngridientType {
 	#[default]
 	Plant,
@@ -43,7 +51,7 @@ impl Ingridient {
 
 		match ingridient_type {
     		IngridientType::Mushroom => {
-				const NAME_1: &[&str] = &["Smelly", "Withes"];
+				const NAME_1: &[&str] = &["Smelly", "Witches"];
 				const NAME_2: &[&str] = &["Toe"];
 
 				name = format!("{} {}", NAME_1[rng.gen_range(0..NAME_1.len())], NAME_2[rng.gen_range(0..NAME_2.len())]);
@@ -64,8 +72,3 @@ impl Ingridient {
 }
 
 
-#[derive(Clone, Copy, Debug)]
-pub struct IngridientEffect {
-	pub effect_type: Effect,
-	pub duration: f32,
-}

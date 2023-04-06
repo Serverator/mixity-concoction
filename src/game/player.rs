@@ -120,8 +120,8 @@ pub fn pickup_entity(
 	mut commands: Commands,
 	mut player_query: Query<(&Transform, &ActionState<Action>, &mut Inventory), With<Player>>,
 	mut ingridient_query: Query<(Entity, &mut Transform), (With<Ingridient>,Without<Player>)>,
-	mut finder_query: Query<&Name>,
-	mut child_query: Query<&Children>,
+	finder_query: Query<&Name>,
+	child_query: Query<&Children>,
 ) {
 	let Ok((player_transform, input, mut inventory)) = player_query.get_single_mut() else {
 		return;

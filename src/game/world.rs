@@ -1,4 +1,4 @@
-use bevy::{math::Vec3Swizzles, scene::SceneInstance, gltf::Gltf, pbr::NotShadowReceiver, render::{view::RenderLayers, once_cell::sync::OnceCell, camera::ScalingMode}, ecs::system::EntityCommands, core_pipeline::{fxaa::Fxaa, clear_color::ClearColorConfig}};
+use bevy::{scene::SceneInstance, render::{view::RenderLayers, camera::ScalingMode}, core_pipeline::{fxaa::Fxaa, clear_color::ClearColorConfig}};
 
 
 use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableCollection, SpawnableType}, game::effects::Ingridient};
@@ -61,6 +61,7 @@ fn init_world(
 			..default()
 		},
 		RigidBody::Fixed,
+		CollisionGroups::new(Group::GROUP_1,Group::GROUP_1),
 	));
 
 	// sphere

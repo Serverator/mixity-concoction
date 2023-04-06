@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::{core_pipeline::fxaa::Fxaa, math::Vec3Swizzles, render::view::RenderLayers};
 
-use super::effects::{Ingredient, ActiveEffects};
+use super::{effects::ActiveEffects, ingredient::Ingredient};
 
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {

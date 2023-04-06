@@ -1,4 +1,4 @@
-use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, Spawnable}, game::effects::{Ingredient, IngredientType}};
+use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, Spawnable}, game::ingredient::{Ingredient, IngredientType}};
 
 pub struct WorldPlugin;
 

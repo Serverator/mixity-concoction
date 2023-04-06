@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+use self::ingredient::Ingredient;
+
 pub mod player;
 pub mod world;
 pub mod physics;
@@ -19,6 +21,7 @@ impl Plugin for GamePlugin {
 			.add_plugin(physics::PhysicsPlugin)
 			.add_plugin(input::InputPlugin)
 			.add_plugin(materials::CustomMaterialPlugin)
-			.add_plugin(backpack::BackpackPlugin);
+			.add_plugin(backpack::BackpackPlugin)
+			.register_type::<Ingredient>();
 	}
 }

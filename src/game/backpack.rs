@@ -1,75 +1,83 @@
 use bevy::{render::{view::RenderLayers, camera::ScalingMode}, core_pipeline::{clear_color::ClearColorConfig, fxaa::Fxaa}};
 
-use crate::{prelude::*, assets::Spawnable};
+use crate::{prelude::*, assets::{self}};
 
 pub struct BackpackPlugin;
 impl Plugin for BackpackPlugin {
 	fn build(&self, app: &mut App) {
 		app
+		.init_resource::<BackpackLocation>()
 		.add_systems((
 			spawn,
 				).in_schedule(OnEnter(GameState::InGame))
-		);
-		// .add_systems((
-		// 	test_init,
-		// 		).in_set(OnUpdate(GameState::InGame))
-		// );
+		)
+		.add_system(update_inventory_items);
 	}
+}
+
+#[derive(Resource,Default)]
+pub struct BackpackLocation(pub Vec2);
+
+#[derive(Component, Clone, Debug, Default, Reflect, FromReflect)]
+pub struct Inventory(pub Vec<Entity>);
+
+#[derive(Component, Debug)]
+pub struct InventoryItem {
+	pub current_size: f32,
+	pub size: f32,
+}
+
+impl Default for InventoryItem {
+    fn default() -> Self {
+        Self { current_size: 0.0, size: 1.0 }
+    }
+}
+
+fn update_inventory_items(
+	mut inventory_query: Query<(&mut InventoryItem, &mut Transform)>,
+	time: Res<Time>,
+) {
+	for (mut ii, mut transform) in &mut inventory_query {
+		ii.current_size = (ii.current_size + time.delta_seconds() * 2.0).min(1.0);
+		transform.scale = Vec3::splat(ii.current_size * ii.size)
+	}
+}
+
+#[derive(Bundle,Debug)]
+struct BackpackWallBundle {
+	pub mesh: Handle<Mesh>,
+    pub material: Handle<FoliageMaterial>,
+    pub transform: Transform,
+    pub global_transform: GlobalTransform,
+    pub visibility: Visibility,
+    pub computed_visibility: ComputedVisibility,
+	collider: Collider,
+	render_layer: RenderLayers,
+	collision_group: CollisionGroups,
+}
+
+impl Default for BackpackWallBundle {
+    fn default() -> Self {
+        Self { 
+			mesh: Default::default(), 
+			transform: Default::default(), 
+			global_transform: Default::default(), 
+			visibility: Default::default(), 
+			computed_visibility: Default::default(), 
+			material: assets::DEFAULT_FOLIAGE.get().unwrap().clone(), 
+			collider: Collider::cuboid(0.5,0.5,0.5),
+			render_layer: RenderLayers::layer(2),
+			collision_group: CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+		}
+    }
 }
 
 fn spawn(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
-	//mut materials: ResMut<Assets<FoliageMaterial>>,
-	mut standard_mat: ResMut<Assets<StandardMaterial>>,
-	spawnables: Res<Assets<Spawnable>>,
+	mut foliage_mat: ResMut<Assets<FoliageMaterial>>,
+	mut backpack_location: ResMut<BackpackLocation>,
 ) {
-		
-	// In other cam
-	commands.spawn((
-		Name::new("Inventory Ball"),
-		PbrBundle {
-			mesh: meshes.add(Mesh::from(shape::UVSphere {
-				radius: 0.4,
-				..default()
-			})),
-			material: standard_mat.add(StandardMaterial {
-				base_color: Color::WHITE,
-				..default()
-			}),
-			transform: Transform::from_xyz(-5.0, 5.0, 0.0),//.with_scale(Vec3::splat(3.0)),
-			..default()
-		},
-		RigidBody::Dynamic,
-		Collider::ball(0.4),
-		RenderLayers::layer(2),
-		CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-		//SolverGroups::new(Group::GROUP_2,Group::GROUP_2),
-	));
-
-	// In other cam
-	commands.spawn((
-		Name::new("Inventory Shroom"),
-		SceneBundle {
-			scene: spawnables.iter().nth(3).unwrap().1.scene.clone(),
-			transform: Transform::from_xyz(-5.0, 3.0, 0.0),//.with_scale(Vec3::splat(3.0)),
-
-			..default()
-		},
-		RigidBody::Dynamic,
-		RenderLayers::layer(2),
-		CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-		Velocity::default(),
-		//SolverGroups::new(Group::GROUP_2,Group::GROUP_2),
-	)).with_children(|commands| {
-		commands.spawn((
-			Collider::ball(0.3),
-			Transform::from_translation(Vec3::Y * 0.25),
-			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-		));
-	});
-	
-
 	// Inventory camera
 	commands.spawn((
 		Name::new("Inventory Camera"),
@@ -99,6 +107,9 @@ fn spawn(
 
 	let cube = meshes.add(Mesh::from(shape::Cube::new(1.0)));
 
+	backpack_location.0 = Vec2::new(-5.0, 3.5);
+
+
 	commands.spawn((
 		Name::new("Backpack"),
 		RigidBody::Fixed,
@@ -107,84 +118,35 @@ fn spawn(
 		RenderLayers::layer(2),
 		CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
 	)).with_children(|commands| {
-		commands.spawn((
-			PbrBundle {
-				mesh: cube.clone(),
-				transform: Transform::from_translation(Vec3::NEG_Y).with_scale(Vec3::new(2.5,0.2,2.0)),
-				..default()
-			},
-			Collider::cuboid(0.5,0.5,0.5),
-			RenderLayers::layer(2),
-			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-		));
 
-		commands.spawn((
-			PbrBundle {
-				mesh: cube.clone(),
-				transform: Transform::from_translation(Vec3::new(-1.25,0.5,0.0)).with_scale(Vec3::new(0.2,3.0,2.0)),
-				..default()
-			},
-			Collider::cuboid(0.5,0.5,0.5),
-			RenderLayers::layer(2),
-			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-		));
+		commands.spawn(BackpackWallBundle {
+			mesh: cube.clone(),
+			transform: Transform::from_translation(Vec3::NEG_Y).with_scale(Vec3::new(2.5,0.2,2.0)),
+			..default()
+		});
 
-		commands.spawn((
-			PbrBundle {
-				mesh: cube.clone(),
-				transform: Transform::from_translation(Vec3::new(1.25,0.5,0.0)).with_scale(Vec3::new(0.2,3.0,2.0)),
-				..default()
-			},
-			Collider::cuboid(0.5,0.5,0.5),
-			RenderLayers::layer(2),
-			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-		));
+		commands.spawn(BackpackWallBundle {
+			mesh: cube.clone(),
+			transform: Transform::from_translation(Vec3::new(-1.25,0.5,0.0)).with_scale(Vec3::new(0.2,3.0,2.0)),
+			..default()
+		});
 
-		commands.spawn((
-			PbrBundle {
-				mesh: cube.clone(),
-				transform: Transform::from_translation(Vec3::new(0.0,0.5,-1.25)).with_scale(Vec3::new(2.5,3.0,0.2)),
-				material: standard_mat.add(StandardMaterial {
-						base_color: Color::WHITE,
-						..default()
-					}),
-				..default()
-			},
-			Collider::cuboid(0.5,0.5,0.5),
-			RenderLayers::layer(2),
-			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-		));
+		commands.spawn(BackpackWallBundle {
+			mesh: cube.clone(),
+			transform: Transform::from_translation(Vec3::new(1.25,0.5,0.0)).with_scale(Vec3::new(0.2,3.0,2.0)),
+			..default()
+		});
 
-		commands.spawn((
-			Transform::from_translation(Vec3::new(0.0,0.5,1.25)).with_scale(Vec3::new(2.5,3.0,0.2)),
-			Collider::cuboid(0.5,0.5,0.5),
-			RenderLayers::layer(2),
-			CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-		));
+		commands.spawn(BackpackWallBundle {
+			mesh: cube.clone(),
+			material: foliage_mat.add(FoliageMaterial { color: Color::GRAY, ..default() }),
+			transform: Transform::from_translation(Vec3::new(0.0,0.5,-0.75)).with_scale(Vec3::new(2.5,3.0,0.2)),
+			..default()
+		});
+
+		commands.spawn(BackpackWallBundle {
+			transform: Transform::from_translation(Vec3::new(0.0,0.5,0.75)).with_scale(Vec3::new(2.5,3.0,0.2)),
+			..default()
+		});
 	});
 }
-
-// #[derive(Component)]
-// struct Test;
-
-// #[allow(clippy::type_complexity)]
-// fn test_init(
-// 	mut commands: Commands,
-// 	scene_manager: Res<SceneSpawner>,
-// 	children_query: Query<&Children>,
-// 	test_query: Query<(Entity, &SceneInstance), (With<Test>, Or<(Without<SceneLoaded>, (With<SceneLoaded>, Changed<SceneInstance>))>)>
-// ) {
-// 	for (entity,scene) in &test_query {
-// 		if !scene_manager.instance_is_ready(**scene) {
-// 			continue;
-// 		}
-
-// 		commands.entity(entity).insert(SceneLoaded);
-
-// 		for child in children_query.iter_descendants(entity) {
-// 			commands.entity(child).insert((
-// 				RenderLayers::layer(2),
-// 			));
-// 		}
-// 	}
-// }

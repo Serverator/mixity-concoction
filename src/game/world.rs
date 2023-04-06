@@ -28,6 +28,7 @@ pub struct Shadow;
 #[derive(Component, Clone)]
 pub struct SpawnableInstance {
 	pub handle: Handle<Spawnable>,
+	pub size: f32,
 	pub rare: bool,
 	//pub archetype: SpawnableArchetype,
 }
@@ -144,13 +145,17 @@ fn spawn_spawnables(
 			continue;
 		}
 
+		let mut handle = Handle::<Spawnable>::weak(*spawnable_handle);
+		handle.make_strong(&spawnable_assets);
+
 		// Set space as occupied
 		occupied_space.0.push((position, spawnable.size * relative_scale));
 
 		let mut entity = commands.spawn((
 			SpawnableInstance {
-				handle: Handle::<Spawnable>::weak(*spawnable_handle),
+				handle,
 				rare: is_rare,
+				size: relative_scale,
 				//archetype: spawnable.archetype,
 			},
 			SceneBundle {

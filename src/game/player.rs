@@ -1,7 +1,7 @@
-use crate::prelude::*;
+use crate::{prelude::*, assets::{Spawnable, PickUpEvent, SceneInstanceReady}};
 use bevy::{core_pipeline::fxaa::Fxaa, math::Vec3Swizzles, render::view::RenderLayers};
 
-use super::{effects::ActiveEffects, ingredient::Ingredient};
+use super::{effects::ActiveEffects, ingredient::Ingredient, world::SpawnableInstance, backpack::{Inventory, InventoryItem, BackpackLocation}};
 
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
@@ -18,7 +18,9 @@ impl Plugin for PlayerPlugin {
 					pickup_entity,
 				)
 					.in_set(OnUpdate(GameState::InGame))
-			);
+			)
+			.register_type::<Inventory>()
+			.register_type::<ActiveEffects>();
 	}
 }
 
@@ -27,9 +29,6 @@ pub struct Player;
 
 #[derive(Component, Clone, Copy, Debug)]
 pub struct PlayerCamera;
-
-#[derive(Component, Clone, Debug, Default)]
-pub struct Inventory(Vec<Entity>);
 
 pub fn spawn_player(
 	mut commands: Commands,
@@ -118,68 +117,93 @@ pub fn move_player(
 pub fn pickup_entity(
 	mut commands: Commands,
 	mut player_query: Query<(&Transform, &ActionState<Action>, &mut Inventory), With<Player>>,
-	mut ingredient_query: Query<(Entity, &mut Transform), (With<Ingredient>,Without<Player>)>,
-	finder_query: Query<&Name>,
+	ingredient_query: Query<(Entity, &Transform, &Ingredient, &SpawnableInstance, &NamedMaterials)>,
+	finder_query: Query<(Entity, &Name)>,
 	child_query: Query<&Children>,
+	spawnables: Res<Assets<Spawnable>>,
+	backpack_location: Res<BackpackLocation>,
 ) {
 	let Ok((player_transform, input, mut inventory)) = player_query.get_single_mut() else {
 		return;
 	};
 
-	if input.just_pressed(Action::Use) {
-		let closest_ingredient = &ingredient_query.iter().filter_map(|(entity,ingr_transform)| {
-			let distance_sq = (ingr_transform.translation - player_transform.translation).length_squared();
-			if distance_sq < 5.0 {
-				Some((distance_sq, entity))
-			} else {
-				None
-			}
-		}).min_by(|(dist_a,_),(dist_b,_)| dist_a.total_cmp(dist_b));
-
-		if let &Some((_,ingr_entity)) = closest_ingredient {
-			inventory.0.push(ingr_entity);
-
-			let mut transform = ingredient_query.get_mut(ingr_entity).unwrap().1;
-
-			transform.translation = Vec3::new(0.0,0.0,0.0);
-
-			dbg!(finder_query.get(ingr_entity).unwrap());
-
-			let mut entity = commands.entity(ingr_entity);
-
-			entity.remove::<Collider>();
-
-			entity.remove_parent();
-
-			entity.insert((
-				RigidBody::Dynamic,
-				Sleeping {
-					sleeping: false,
-					..default()
-				},
-				Velocity::default(),
-				Collider::ball(0.5),
-				ColliderMassProperties::MassProperties(
-					MassProperties {
-						mass: 2.0,
-						..default()
-					}
-				),
-				RenderLayers::layer(2),
-				CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-				SolverGroups::new(Group::GROUP_2,Group::GROUP_2),
-			));
-
-			for child in child_query.iter_descendants(entity.id()) {
-				let mut child = commands.entity(child);
-
-				child.insert((
-					RenderLayers::layer(2),
-				));
-			}
-
-		}
+	if !input.just_pressed(Action::Use) {
+		return;
 	}
+
+	let &Some((entity,_,ingredient,spawnable_instance, named_materials)) = &ingredient_query.iter().filter_map(|comps| {
+		let distance_sq = (comps.1.translation - player_transform.translation).length_squared();
+		if distance_sq < 5.0 {
+			Some((distance_sq, comps))
+		} else {
+			None
+		}
+	}).min_by(|(dist_a,_),(dist_b,_)| dist_a.total_cmp(dist_b)).map(|(_,c)| c) else {
+		return;
+	};
+
+	let Some(spawnable) = spawnables.get(&spawnable_instance.handle) else {
+		warn!("Did not find spawnable in assets!");
+		return;
+	};
+
+	let ingredient_info = spawnable.ingredient.as_ref().unwrap();
+
+	// Do something to original entity
+	match &ingredient_info.pick_event {
+    	PickUpEvent::Destroy => commands.entity(entity).despawn_recursive(),
+		PickUpEvent::Replace(scene) => {
+			commands.entity(entity)
+				.remove::<Handle<Scene>>()
+				.remove::<SceneInstanceReady>()
+				.remove::<Ingredient>()
+				.insert(scene.clone());
+		},
+    	PickUpEvent::RemoveNamedChild(name) => {
+			commands.entity(entity)
+				.remove::<Ingredient>();
+
+			for (child,child_name) in child_query.iter_descendants(entity).filter_map(|child| finder_query.get(child).ok()) {
+				if child_name.contains(name) {
+					commands.entity(child).despawn_recursive();
+				}
+			}
+		},
+	}
+
+	let mut rng = thread_rng();
+
+	let mut col = ingredient_info.with_collider.clone();
+	let size = spawnable_instance.size * 1.5;
+	col.1.translation *= size;
+
+	let inventory_item = commands.spawn((
+		Name::new(ingredient.name.clone()),
+		SceneBundle {
+			scene: ingredient_info.inventory_scene.clone(),
+			transform: Transform::from_xyz(backpack_location.0.x + rng.gen_range(-1.0..1.0), backpack_location.0.y + rng.gen_range(-1.0..1.0), 0.0),
+			..default()
+		},
+		ingredient.clone(),
+		named_materials.clone(),
+		InventoryItem {
+			size,
+			..default()
+		},
+		RigidBody::Dynamic,
+		RenderLayers::layer(2),
+		CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
+		Velocity::default(),
+	)).with_children(|commands| {
+		
+		commands.spawn((
+			GlobalTransform::default(),
+			col,
+		));
+
+	}).id();
+
+	inventory.0.push(inventory_item);
 }
 
 pub fn camera_follow(

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use bevy::{render::{render_resource::{ShaderRef, AsBindGroup, SamplerDescriptor, AddressMode, FilterMode, ShaderType, AsBindGroupShaderType}, once_cell::sync::OnceCell, texture::ImageSampler}, reflect::TypeUuid};
 
 use crate::{prelude::*, assets::{SceneInstanceReady, SpawnableArchetype}, choice};
@@ -11,7 +13,10 @@ impl Plugin for CustomMaterialPlugin {
 		app
 			.add_plugin(MaterialPlugin::<FoliageMaterial>::default())
 			.add_system(set_dither_texture.in_schedule(OnExit(GameState::LoadingAssets)))
-			.add_system(replace_materials);
+			.add_system(replace_materials)
+			.register_type::<FoliageMaterial>()
+			.register_type::<NamedMaterials>()
+			.register_type::<NamedMaterial>();
 	}
 }
 
@@ -36,7 +41,7 @@ pub fn set_dither_texture(
 	DITHER_HANDLE.set(game_assets.dither_texture.clone()).unwrap();
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone, Copy, Default)]
+#[derive(AsBindGroup, TypeUuid, Debug, Clone, Copy, Default, Reflect, FromReflect)]
 #[uuid = "33fbe40a-eff7-4e20-a44f-997397cf2085"]
 #[uniform(0, FoliageMaterialUniform)]
 pub struct FoliageMaterial {
@@ -75,8 +80,9 @@ impl Material for FoliageMaterial {
 
 }
 
+#[derive(Clone, Reflect, FromReflect, Default)]
 pub struct NamedMaterial {
-	name: &'static str,
+	name: Cow<'static, str>,
 	material: FoliageMaterial,
 }
 
@@ -95,7 +101,7 @@ impl NamedMaterial {
 		};
 
 		NamedMaterial {
-    		name: "Trunk",
+    		name: Cow::Borrowed("Trunk"),
     		material: FoliageMaterial {
 				color,
 				..default()
@@ -118,7 +124,7 @@ impl NamedMaterial {
 		};
 
 		NamedMaterial {
-    		name: "Leaves",
+    		name: Cow::Borrowed("Leaves"),
     		material: FoliageMaterial {
 				color,
 				sss: true,
@@ -128,7 +134,7 @@ impl NamedMaterial {
 
 	pub fn mushroom_stem(_is_rare: bool, _rng: &mut impl Rng) -> Self {
 		NamedMaterial {
-    		name: "Stem",
+    		name: Cow::Borrowed("Stem"),
     		material: FoliageMaterial {
 				color: Color::rgb(0.8, 0.8, 0.8),
 				sss: true,
@@ -144,7 +150,7 @@ impl NamedMaterial {
 		};
 
 		NamedMaterial {
-    		name: "Cap",
+    		name: Cow::Borrowed("Cap"),
     		material: FoliageMaterial {
 				color,
 				..default()
@@ -154,8 +160,8 @@ impl NamedMaterial {
 
 }
 
-#[derive(Component, Default)]
-pub struct NamedMaterials(pub Vec<NamedMaterial>);
+#[derive(Clone, Component, Default, Reflect)]
+pub struct NamedMaterials(pub SmallVec<[NamedMaterial;4]>);
 
 impl NamedMaterials {
 	pub fn push(&mut self, value: NamedMaterial) {
@@ -207,7 +213,7 @@ pub fn replace_materials(
 	for (parent, material) in &spawnable_query {
 
 		for (child, name, maybe_material) in children_query.iter_descendants(parent).filter_map(|child| name_query.get(child).ok()) {
-			let Some(material) = material.0.iter().find(|x| name.contains(x.name)).map(|x| x.material) else {
+			let Some(material) = material.0.iter().find(|x| name.contains(&*x.name)).map(|x| x.material) else {
 				continue;
 			};
 

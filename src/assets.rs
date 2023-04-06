@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::{gltf::Gltf, render::{once_cell::sync::OnceCell, view::RenderLayers}, scene::{SceneInstance}, reflect::TypeUuid};
+use bevy::{gltf::Gltf, render::{once_cell::sync::OnceCell, view::RenderLayers}, scene::SceneInstance, reflect::TypeUuid};
 pub use bevy_asset_loader::prelude::*;
 use bevy::ecs::query::ReadOnlyWorldQuery;
 
@@ -25,14 +25,18 @@ impl Plugin for AssetLoadingPlugin {
 
 pub static SHADOW_BUNDLE: OnceCell<(Handle<StandardMaterial>,Handle<Mesh>)> = OnceCell::new();
 
+pub static DEFAULT_FOLIAGE: OnceCell<Handle<FoliageMaterial>> = OnceCell::new();
+
 fn setup(
-    //commands: Commands,
     mut spawnable_assets: ResMut<Assets<Spawnable>>,
 	mut mesh_assets: ResMut<Assets<Mesh>>,
 	mut material_assets: ResMut<Assets<StandardMaterial>>,
+    mut foliage_assets: ResMut<Assets<FoliageMaterial>>,
 	assets: Res<GameAssets>,
     gltfs: Res<Assets<Gltf>>,
 ) {
+    DEFAULT_FOLIAGE.set(foliage_assets.add(FoliageMaterial::default())).unwrap();
+
 	let plane_mesh = mesh_assets.add(Mesh::from(shape::Plane { size: 1.0, subdivisions: 0 }));
 
 	let shadow_material = material_assets.add(StandardMaterial {
@@ -76,7 +80,7 @@ fn setup(
     }
 
     let ingredient_scenes = &gltfs.get(&assets.ingredients_gltf).unwrap().scenes;
-    for (i,scene) in ingredient_scenes.iter().enumerate() {
+    for (i,scene) in ingredient_scenes.iter().enumerate() {     
         let spawnable = Spawnable {
             id: i,
             archetype: SpawnableArchetype::Mushroom,
@@ -84,6 +88,7 @@ fn setup(
             ingredient: Some(SpawnableIngredient { 
                 pick_event: PickUpEvent::Destroy,
                 inventory_scene: scene.clone(),
+                with_collider: (Collider::ball(0.26), Transform::from_xyz(0.0, 0.25, 0.0)),
             }),
             spawn_weight: 0.5 / ingredient_scenes.len() as f32,
             size: 0.6
@@ -92,10 +97,11 @@ fn setup(
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct SpawnableIngredient {
-    pick_event: PickUpEvent,
-    inventory_scene: Handle<Scene>,
+    pub pick_event: PickUpEvent,
+    pub inventory_scene: Handle<Scene>,
+    pub with_collider: (Collider, Transform),
 }
 
 #[allow(dead_code)]
@@ -106,8 +112,8 @@ pub enum PickUpEvent {
     Destroy,
     /// Removes a child with specified name
     RemoveNamedChild(&'static str),
-    // TODO: Make it happen, but not now
-    //Replace(Handle<Scene>),
+    /// Replaces scene from one to another
+    Replace(Handle<Scene>),
 }
 
 #[derive(TypeUuid)]

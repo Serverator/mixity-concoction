@@ -3,7 +3,7 @@ use crate::prelude::*;
 use super::effects::Effect;
 
 
-#[derive(Debug, Clone, Component, Default)]
+#[derive(Debug, Clone, Component, Default, Reflect)]
 pub struct Ingredient {
 	pub ingredient_type: IngredientType,
 	pub name: String,
@@ -11,14 +11,14 @@ pub struct Ingredient {
 	pub effects: SmallVec<[IngredientEffect;4]>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Reflect, FromReflect)]
 pub struct IngredientEffect {
 	pub effect_type: Effect,
 	pub duration: f32,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Reflect, FromReflect)]
 // TODO_OLEG: Add more ingredient types
 pub enum IngredientType {
 	#[default]

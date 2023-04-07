@@ -1,4 +1,6 @@
-use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, Spawnable}, game::ingredient::{Ingredient, IngredientType}};
+use bevy::scene::SceneInstance;
+
+use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, Spawnable, SceneInstanceReady}, game::ingredient::{Ingredient, IngredientType}};
 
 pub struct WorldPlugin;
 
@@ -9,7 +11,11 @@ impl Plugin for WorldPlugin {
 		.add_systems((
 			init_world,
 			spawn_spawnables,
-				).in_schedule(OnEnter(GameState::InGame))
+				).in_schedule(OnEnter(GameState::GeneratingWorld))
+		)
+		.add_system(
+			check_if_finished
+				.in_set(OnUpdate(GameState::GeneratingWorld))
 		);
 		// .add_systems((
 		// 	set_materials_to_spawnables,
@@ -56,7 +62,7 @@ fn init_world(
 			..default()
 		},
 		RigidBody::Fixed,
-		CollisionGroups::new(Group::GROUP_1,Group::GROUP_1),
+		CollisionGroups::new(Group::GROUP_1, Group::GROUP_1 | Group::GROUP_3),
 	));
 
 	// sphere
@@ -81,9 +87,9 @@ fn init_world(
 		Restitution::new(0.70),
 		GravityScale(1.3),
 		Friction::new(0.2),
+		Dominance::group(-10),
 		//RenderLayers::layer(2),
-		CollisionGroups::new(Group::GROUP_1,Group::GROUP_1),
-		SolverGroups::new(Group::GROUP_1,Group::GROUP_1),
+		CollisionGroups::new(Group::GROUP_1 | Group::GROUP_3, Group::GROUP_1 | Group::GROUP_3),
 	));
 
 	// Light
@@ -102,6 +108,16 @@ fn init_world(
 		color: Color::ALICE_BLUE,
 		brightness: 0.15,
 	});
+}
+
+fn check_if_finished(
+	unloaded_scenes: Query<(),(With<SceneInstance>, Without<SceneInstanceReady>)>,
+	mut next_state: ResMut<NextState<GameState>>
+) {
+	if unloaded_scenes.is_empty() {
+		info!("World generation finished!");
+		next_state.set(GameState::InGame);
+	}
 }
 
 /// Set spawn spawnable objects
@@ -165,7 +181,7 @@ fn spawn_spawnables(
 					.with_rotation(Quat::from_rotation_y(rng.gen_range(-PI..PI))),
 				..default()
 			},
-			CollisionGroups::new(Group::GROUP_1,Group::GROUP_1),
+			CollisionGroups::new(Group::GROUP_1, Group::GROUP_1 | Group::GROUP_3),
 			// Applies materials to the spawned scene
 			NamedMaterials::generate_materials(spawnable.archetype, is_rare, &mut rng),
 		));

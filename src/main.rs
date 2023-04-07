@@ -45,6 +45,7 @@ pub enum GameState {
 	LoadingAssets,
 	MainMenu,
 	InGame,
+	GeneratingWorld,
 }
 
 pub mod prelude {

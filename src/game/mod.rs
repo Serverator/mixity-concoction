@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 use self::ingredient::Ingredient;
 
+pub mod alchemy;
 pub mod player;
 pub mod world;
 pub mod physics;
@@ -22,6 +23,7 @@ impl Plugin for GamePlugin {
 			.add_plugin(input::InputPlugin)
 			.add_plugin(materials::CustomMaterialPlugin)
 			.add_plugin(backpack::BackpackPlugin)
+			.add_plugin(alchemy::AlchemyPlugin)
 			.register_type::<Ingredient>();
 	}
 }

@@ -11,7 +11,7 @@ impl Plugin for AssetLoadingPlugin {
             .add_asset::<Spawnable>()
 			.add_loading_state(
                 LoadingState::new(GameState::LoadingAssets)
-                    .continue_to_state(GameState::InGame)
+                    .continue_to_state(GameState::GeneratingWorld)
             )
 			.add_collection_to_loading_state::<_, GameAssets>(GameState::LoadingAssets)
             .add_system(setup.in_schedule(OnExit(GameState::LoadingAssets)))

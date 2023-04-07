@@ -13,7 +13,7 @@ impl Plugin for CustomMaterialPlugin {
 		app
 			.add_plugin(MaterialPlugin::<FoliageMaterial>::default())
 			.add_system(set_dither_texture.in_schedule(OnExit(GameState::LoadingAssets)))
-			.add_system(replace_materials)
+			.add_system(replace_materials.in_base_set(CoreSet::PostUpdate))
 			.register_type::<FoliageMaterial>()
 			.register_type::<NamedMaterials>()
 			.register_type::<NamedMaterial>();

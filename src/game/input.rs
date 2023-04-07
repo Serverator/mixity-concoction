@@ -1,3 +1,5 @@
+
+
 use crate::prelude::*;
 
 pub struct InputPlugin;
@@ -13,6 +15,7 @@ pub fn default_inputs() -> InputManagerBundle::<Action> {
 	InputManagerBundle::<Action> {
 		action_state: ActionState::default(),
 		input_map: InputMap::default()
+			.insert(MouseButton::Left, Action::Click)
 			.insert(DualAxis::left_stick(), Action::Move)
 			.insert(VirtualDPad::wasd(), Action::Move)
 			.insert(KeyCode::E, Action::Use)
@@ -27,6 +30,7 @@ pub fn default_inputs() -> InputManagerBundle::<Action> {
 
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum Action {
+	Click,
     Move,
 	Use,
 	Look,

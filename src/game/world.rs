@@ -31,7 +31,7 @@ pub struct OccupiedSpawnSpace(Vec<(Vec2,f32)>);
 #[derive(Component, Clone, Copy)]
 pub struct Shadow;
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Debug)]
 pub struct SpawnableInstance {
 	pub handle: Handle<Spawnable>,
 	pub size: f32,
@@ -99,7 +99,7 @@ fn init_world(
 			shadows_enabled: false,
 			..default()
 		},
-		transform: Transform::from_xyz(0.0, 2.0, 0.0).with_rotation(Quat::from_rotation_y(0.5) * Quat::from_rotation_x(-PI/3.5)),
+		transform: Transform::from_xyz(0.0, 2.0, 0.0).with_rotation(Quat::from_euler(EulerRot::XYZ, -1.1, 0.33, 0.404)),
 		..default()
 	});
 
@@ -141,7 +141,7 @@ fn spawn_spawnables(
 		VisibilityBundle::default(),
 	)).id();
 
-	for i in 0..10000 {
+	for i in 0..12000 {
 		let Some((spawnable_handle,spawnable)) = choose_spawnable.get_random(&mut rng) else {
 			warn!("Couldn't randomly choose spawnable from assets!");
 			continue;
@@ -168,6 +168,7 @@ fn spawn_spawnables(
 		occupied_space.0.push((position, spawnable.size * relative_scale));
 
 		let mut entity = commands.spawn((
+			RigidBody::Fixed,
 			SpawnableInstance {
 				handle,
 				rare: is_rare,
@@ -190,22 +191,24 @@ fn spawn_spawnables(
     		SpawnableArchetype::Tree => {
 				entity.insert((
 					Name::new(format!("Tree {i}")),
-					Collider::cylinder(4.0, 0.7),
 				));
 			},
     		SpawnableArchetype::Bush => {
 				entity.insert((
 					Name::new(format!("Bush {i}")),
-					Collider::cylinder(4.0, 0.2),
 				));
 			},
     		SpawnableArchetype::Mushroom => {
 				entity.insert((
 					Ingredient::generate_random_ingredient(&mut rng, IngredientType::Mushroom, is_rare),
 					Name::new(format!("Mushroom {i}")),
-					Collider::cylinder(4.0, 0.1),
 				));
 			},
+		}
+
+		// Collider
+		if let Some(collider) = &spawnable.collider {
+			entity.insert(collider.clone());
 		}
 
 		// Add shadow to entity

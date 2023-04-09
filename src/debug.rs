@@ -9,7 +9,10 @@ impl Plugin for DebugPlugin {
 	fn build(&self, app: &mut App) {
 		app
 			.add_plugin(WorldInspectorPlugin::new())
+			//.add_plugin(RapierDebugRenderPlugin {
+			//	always_on_top: true,
+			//	..default()
+			//})
 			.add_plugin(DebugLinesPlugin::with_depth_test(true));
-			//.add_plugin(StateInspectorPlugin::<GameState>::default());
 	}
 }

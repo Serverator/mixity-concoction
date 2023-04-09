@@ -9,6 +9,7 @@ impl Plugin for PhysicsPlugin {
 	}
 }
 
+
 fn configure_physics(mut config: ResMut<RapierConfiguration>) {
 	config.gravity = Vec3::NEG_Y * 9.8;
 	config.timestep_mode = TimestepMode::Variable {

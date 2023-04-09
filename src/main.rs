@@ -1,4 +1,4 @@
-use bevy::window::WindowResolution;
+
 
 use crate::prelude::*;
 
@@ -24,7 +24,7 @@ fn main() {
 					primary_window: Some(Window {
 						title: "Project Concoction".to_string(),
 						present_mode: bevy::window::PresentMode::Immediate,
-						resolution: WindowResolution::new(600.0, 350.0),
+						//resolution: WindowResolution::new(600.0, 350.0),
 						..default()
 					}),
 					..default()
@@ -54,7 +54,7 @@ pub mod prelude {
 	pub use leafwing_input_manager::prelude::*;
 	pub use rand::prelude::*;
 	pub use std::f32::consts::PI;
-	pub use smallvec::SmallVec;
+	pub use smallvec::*;
 	
 	pub use crate::helper::*;
 	pub use crate::assets::GameAssets;

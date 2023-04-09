@@ -2,8 +2,6 @@ use bevy::{render::view::RenderLayers, math::{Vec4Swizzles, Vec3Swizzles}};
 
 use crate::prelude::*;
 
-use super::{ingredient::Ingredient, backpack::{InventoryItem, InventoryCamera}};
-
 pub struct AlchemyPlugin;
 impl Plugin for AlchemyPlugin {
 	fn build(&self, app: &mut App) {
@@ -14,15 +12,10 @@ impl Plugin for AlchemyPlugin {
 		)
 		.add_systems(( // Update in game state
 			check_mortar_chushing,
-			item_grab_system
 				).in_set(OnUpdate(GameState::InGame))
-		)
-		.init_resource::<GrabbedEntity>();
+		);
 	}
 }
-
-#[derive(Resource, Default, Clone, Copy)]
-pub struct GrabbedEntity(pub Option<Entity>);
 
 #[derive(Component)]
 pub struct AlchemyTable;
@@ -49,35 +42,35 @@ fn default() -> Self {
 }
 
 fn init_alchemy_table(
-	mut commands: Commands,
-	mut materials: ResMut<Assets<FoliageMaterial>>,
-	mut meshes: ResMut<Assets<Mesh>>
+	_commands: Commands,
+	_materials: ResMut<Assets<FoliageMaterial>>,
+	_meshes: ResMut<Assets<Mesh>>
 ) {
-	commands.spawn((
-		Mortar(false),
-		Name::new("Mortar"),
-		RigidBody::Dynamic,
-		Velocity::default(),
-		MaterialMeshBundle {
-			mesh: meshes.add(Mesh::from(shape::Cylinder { radius: 1.5, height: 0.3, resolution: 12, segments: 1 })),
-			material: crate::assets::DEFAULT_FOLIAGE.get().unwrap().clone(),
-			..default()
-		},
-		SecondWorldBundle::default()
-	));
-
-	commands.spawn((
-		Pestle,
-		Name::new("Pestle"),
-		RigidBody::Dynamic,
-		Velocity::default(),
-		MaterialMeshBundle {
-			mesh: meshes.add(Mesh::from(shape::Cylinder { radius: 0.3, height: 1.0, resolution: 5, segments: 1 })),
-			material: crate::assets::DEFAULT_FOLIAGE.get().unwrap().clone(),
-			..default()
-		},
-		SecondWorldBundle::default()
-	));
+	//commands.spawn((
+	//	Mortar(false),
+	//	Name::new("Mortar"),
+	//	RigidBody::Dynamic,
+	//	Velocity::default(),
+	//	MaterialMeshBundle {
+	//		mesh: meshes.add(Mesh::from(shape::Cylinder { radius: 1.5, height: 0.3, resolution: 12, segments: 1 })),
+	//		material: crate::assets::DEFAULT_FOLIAGE.get().unwrap().clone(),
+	//		..default()
+	//	},
+	//	SecondWorldBundle::default()
+	//));
+//
+	//commands.spawn((
+	//	Pestle,
+	//	Name::new("Pestle"),
+	//	RigidBody::Dynamic,
+	//	Velocity::default(),
+	//	MaterialMeshBundle {
+	//		mesh: meshes.add(Mesh::from(shape::Cylinder { radius: 0.3, height: 1.0, resolution: 5, segments: 1 })),
+	//		material: crate::assets::DEFAULT_FOLIAGE.get().unwrap().clone(),
+	//		..default()
+	//	},
+	//	SecondWorldBundle::default()
+	//));
 }
 
 #[allow(clippy::type_complexity)]
@@ -113,54 +106,17 @@ fn check_mortar_chushing(
 	}
 } 
 
-fn mash_ingridient(
-	ingridient_query: Query<(Entity, &Ingredient, &Transform), With<InventoryItem>>,
-	mortar_query: Query<(&Transform, &Velocity), (With<Mortar>, With<InventoryItem>)>,
-	pestle_query: Query<(&Transform, &Velocity), (With<Pestle>, With<InventoryItem>)>,
-) {
 
-	for (ingredient_entity, ingredient_info, ingredient_transfrom) in &ingridient_query {
+// #[allow(clippy::type_complexity)]
+// fn mash_ingridient(
+// 	ingridient_query: Query<(Entity, &Ingredient, &Transform), With<InventoryItem>>,
+// 	_mortar_query: Query<(&Transform, &Velocity), (With<Mortar>, With<InventoryItem>)>,
+// 	_pestle_query: Query<(&Transform, &Velocity), (With<Pestle>, With<InventoryItem>)>,
+// ) {
 
-	}
+// 	for (_ingredient_entity, _ingredient_info, _ingredient_transfrom) in &ingridient_query {
+
+// 	}
 	
-}
+// }
 
-fn item_grab_system(
-	ingridient_query: Query<(Entity, &mut Transform, &GlobalTransform), With<InventoryItem>>,
-	parent_query: Query<&Parent>,
-	rapier_context: Res<RapierContext>,
-	inventory_camera: Query<(&GlobalTransform, &Camera), With<InventoryCamera>>,
-	windows: Query<&Window>,
-	input: Query<&ActionState<Action>>,
-	mut grabbed_entity: ResMut<GrabbedEntity>,
-) {
-	if input.single().just_released(Action::Click) { 
-		if let Some(grabbed) = grabbed_entity.0 {
-			// TODO: Deattach grabber
-			info!("Ungrabbed {:?}", grabbed);
-		}
-		grabbed_entity.0 = None;
-		return; 
-	}
-
-	// let .. else go brrrr
-	if !input.single().just_pressed(Action::Click) { return; }
-
-	let Some(mouse_position) = windows.single().cursor_position() else { return; };
-
-	let Ok((camera_transform,camera)) = inventory_camera.get_single() else {
-		warn!("Couldn't find inventory camera!");
-		return;
-	};
-
-	let Some(ray) = camera.viewport_to_world(camera_transform, mouse_position) else { return; };
-
-	let filter = QueryFilter::only_dynamic().exclude_sensors().groups(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
-	let Some((entity,distance)) = rapier_context.cast_ray(ray.origin, ray.direction, 100.0, true, filter) else { return; };
-
-	let Some((entity, transform, global_transform)) = parent_query.iter_ancestors(entity).find_map(|parent| ingridient_query.get(parent).ok()) else { return; }; 
-	
-	grabbed_entity.0 = Some(entity);
-	info!("Grabbed {:?}",entity);
-
-}

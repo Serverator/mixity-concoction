@@ -11,6 +11,7 @@ pub mod materials;
 pub mod effects;
 pub mod ingredient;
 pub mod backpack;
+pub mod items;
 
 pub struct GamePlugin;
 
@@ -24,6 +25,7 @@ impl Plugin for GamePlugin {
 			.add_plugin(materials::CustomMaterialPlugin)
 			.add_plugin(backpack::BackpackPlugin)
 			.add_plugin(alchemy::AlchemyPlugin)
+			.add_plugin(items::ItemsPlugin)
 			.register_type::<Ingredient>();
 	}
 }

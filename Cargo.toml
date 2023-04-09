@@ -14,7 +14,7 @@ opt-level = 3
 # Bevy specific crates
 bevy = "0.10.1"
 bevy_embedded_assets = "0.7.0"
-bevy_rapier3d = "0.21.0"
+bevy_rapier3d = { version = "0.21.0", features = ["debug-render-3d"] }
 bevy_asset_loader = "0.16.0"
 leafwing-input-manager = "0.9.1"
 # Other

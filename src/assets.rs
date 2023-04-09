@@ -33,6 +33,7 @@ fn setup(
 	mut material_assets: ResMut<Assets<StandardMaterial>>,
     mut foliage_assets: ResMut<Assets<FoliageMaterial>>,
 	assets: Res<GameAssets>,
+    _scenes: Res<Assets<Scene>>,
     gltfs: Res<Assets<Gltf>>,
 ) {
     DEFAULT_FOLIAGE.set(foliage_assets.add(FoliageMaterial::default())).unwrap();
@@ -51,14 +52,17 @@ fn setup(
 
     let tree_scenes = &gltfs.get(&assets.tree_gltf).unwrap().scenes;
     
-    for (i,tree) in tree_scenes.iter().enumerate() {
+    
+
+    for (i,scene) in tree_scenes.iter().enumerate() {
         let spawnable = Spawnable {
             id: i,
             archetype: SpawnableArchetype::Tree,
-            scene: tree.clone(),
+            scene: scene.clone(),
             ingredient: None,
             spawn_weight: 1.5 / tree_scenes.len() as f32,
-            size: 2.8
+            size: 2.8,
+            collider: Some(Collider::capsule(Vec3::ZERO, Vec3::Y * 2.0, 0.4)),
         };
         spawnable_assets.add(spawnable);
     }
@@ -74,13 +78,15 @@ fn setup(
             size: match i {
                 1 => 2.0,
                 _ => 1.5
-            }
+            },
+            collider: Some(Collider::capsule(Vec3::ZERO, Vec3::Y * 2.0, 0.2)),
         };
         spawnable_assets.add(spawnable);
     }
 
     let ingredient_scenes = &gltfs.get(&assets.ingredients_gltf).unwrap().scenes;
     for (i,scene) in ingredient_scenes.iter().enumerate() {     
+
         let spawnable = Spawnable {
             id: i,
             archetype: SpawnableArchetype::Mushroom,
@@ -88,10 +94,15 @@ fn setup(
             ingredient: Some(SpawnableIngredient { 
                 pick_event: PickUpEvent::Destroy,
                 inventory_scene: scene.clone(),
-                with_collider: (Collider::ball(0.26), Transform::from_xyz(0.0, 0.25, 0.0)),
+                collider: Collider::compound(vec![
+                    //(Vec3::new(0.0, 0.21, 0.0),Quat::IDENTITY,Collider::ball(0.25)),
+                    (Vec3::new(0.0, 0.36, 0.0),Quat::IDENTITY,Collider::round_cone(0.08, 0.26, 0.04)),
+                    (Vec3::new(0.0, 0.02, 0.0),Quat::IDENTITY,Collider::capsule(Vec3::ZERO,Vec3::Y * 0.26, 0.09)),
+                ]), 
             }),
             spawn_weight: 0.5 / ingredient_scenes.len() as f32,
-            size: 0.6
+            size: 0.6,
+            collider: None,
         };
         spawnable_assets.add(spawnable);
     }
@@ -101,7 +112,36 @@ fn setup(
 pub struct SpawnableIngredient {
     pub pick_event: PickUpEvent,
     pub inventory_scene: Handle<Scene>,
-    pub with_collider: (Collider, Transform),
+    pub collider: Collider,
+}
+
+impl SpawnableIngredient {
+    #[allow(dead_code)]
+    pub fn compute_collider(scene: &Handle<Scene>, scenes: &Assets<Scene>, meshes: &Assets<Mesh>) -> Collider {
+        let scene = scenes.get(scene).unwrap();
+
+        let collider_shape = ComputedColliderShape::ConvexDecomposition(VHACDParameters::default());
+
+        // I WILL NEST AS MUCH SHAPES AS I WANT BITCHES
+
+        let shapes = scene.world
+            .iter_entities()
+            .filter_map(|entity| entity.get::<Handle<Mesh>>())
+            .filter_map(|mesh_handle| meshes.get(mesh_handle))
+            .filter_map(|mesh| Collider::from_bevy_mesh(mesh, &collider_shape))
+            .filter_map(|col| {
+                col.as_compound()
+                .map(|comp| comp.raw.shapes().iter()
+                    .map(|(pos, shape)| {
+                        let (tra, rot) = (*pos).into();
+                        (tra, rot, shape.clone().into())
+                    })   
+                ).map(|a| a.collect::<Vec<_>>())
+            })
+            .fold(vec![], |mut acc, iter| { acc.extend(iter); acc } );
+
+        Collider::compound(shapes)
+    }
 }
 
 #[allow(dead_code)]
@@ -125,6 +165,7 @@ pub struct Spawnable {
     pub ingredient: Option<SpawnableIngredient>,
     pub spawn_weight: f32,
     pub size: f32,
+    pub collider: Option<Collider>,
 }
 
 impl PartialEq for Spawnable {
@@ -160,6 +201,10 @@ pub struct GameAssets {
     pub bush_gltf: Handle<Gltf>,
     #[asset(path = "models/ingredients.gltf")]
     pub ingredients_gltf: Handle<Gltf>,
+    #[asset(path = "models/backpack.gltf")]
+    pub backpack_gltf: Handle<Gltf>,
+    #[asset(path = "models/potions.gltf")]
+    pub potions_gltf: Handle<Gltf>,
 }
 
 #[derive(Component)]

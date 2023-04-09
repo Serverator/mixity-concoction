@@ -80,13 +80,21 @@ impl Material for FoliageMaterial {
 
 }
 
-#[derive(Clone, Reflect, FromReflect, Default)]
+#[derive(Clone, Reflect, FromReflect, Default, Debug)]
 pub struct NamedMaterial {
 	name: Cow<'static, str>,
 	material: FoliageMaterial,
 }
 
 impl NamedMaterial {
+
+	pub fn new(name: impl Into<Cow<'static, str>>, color: Color) -> Self {
+		NamedMaterial {
+    		name: name.into(),
+    		material: FoliageMaterial { color, sss: false },
+		}
+	}
+
 	pub fn trunk(is_rare: bool, rng: &mut impl Rng) -> Self {
 		const TRUNK_COLORS: Choices<Color> = choice![
 			Color::rgb(0.5, 0.3, 0.05),
@@ -100,13 +108,7 @@ impl NamedMaterial {
 			*TRUNK_COLORS.random(rng)
 		};
 
-		NamedMaterial {
-    		name: Cow::Borrowed("Trunk"),
-    		material: FoliageMaterial {
-				color,
-				..default()
-			}
-		}
+		NamedMaterial::new("Trunk", color)
 	}
 
 	pub fn leaves(is_rare: bool, rng: &mut impl Rng) -> Self {
@@ -149,19 +151,13 @@ impl NamedMaterial {
 			Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.5..0.65), rng.gen_range(0.35..0.55))
 		};
 
-		NamedMaterial {
-    		name: Cow::Borrowed("Cap"),
-    		material: FoliageMaterial {
-				color,
-				..default()
-			}
-		}
+    	NamedMaterial::new("Cap", color)
 	}
 
 }
 
-#[derive(Clone, Component, Default, Reflect)]
-pub struct NamedMaterials(pub SmallVec<[NamedMaterial;4]>);
+#[derive(Clone, Component, Default, Reflect, Debug)]
+pub struct NamedMaterials(pub SmallVec<[NamedMaterial;5]>);
 
 impl NamedMaterials {
 	pub fn push(&mut self, value: NamedMaterial) {
@@ -174,6 +170,20 @@ impl NamedMaterials {
 
 	pub fn iter_mut(&mut self) -> core::slice::IterMut<NamedMaterial> {
 		self.0.iter_mut()
+	}
+
+	pub fn backpack() -> Self {
+		const LEATHER_COLOR: Color = Color::rgb(0.45,0.2,0.0);
+		const STRAP_COLOR: Color = Color::rgb(0.25,0.08,0.0);
+		const BUCKLE_COLOR: Color = Color::rgb(0.7,0.3,0.04);
+
+		NamedMaterials( smallvec![
+			NamedMaterial::new("Open", LEATHER_COLOR),
+			NamedMaterial::new("Closed", LEATHER_COLOR),
+			NamedMaterial::new("Inside", STRAP_COLOR),
+			NamedMaterial::new("Straps", STRAP_COLOR),
+			NamedMaterial::new("Buckle", BUCKLE_COLOR),
+		])
 	}
 }
 

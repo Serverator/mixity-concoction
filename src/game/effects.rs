@@ -292,8 +292,8 @@ pub fn generate_effect(effect_quality: &EffectQuality, rng: &mut impl Rng) -> Ef
 		},
 	    EffectQuality::Neutral => {
 			const NEUTRAL: Choices<EffectType> = choice!(
-				SpawnBall,
-				TreeRockets,
+				//SpawnBall,
+				//TreeRockets,
 				NoGravity,
 			);
 			NEUTRAL
@@ -302,13 +302,13 @@ pub fn generate_effect(effect_quality: &EffectQuality, rng: &mut impl Rng) -> Ef
 			const POSITIVE: Choices<EffectType> = choice!(
 				Haste,
 				Arrow,
-				LuckyHands,
+				//LuckyHands,
 			);
 			POSITIVE
 		},
 	    EffectQuality::Exceptional => {
 			const EXCEPTIONAL: Choices<EffectType> = choice!(
-				GodMode,
+				//GodMode,
 				RareArrows,
 			);
 			EXCEPTIONAL

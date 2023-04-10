@@ -48,7 +48,7 @@ fn init_world(
 	game_assets: Res<GameAssets>,
 	audio: Res<Audio>,
 ) {
-	audio.play_with_settings(game_assets.music.clone(), PlaybackSettings { repeat: true, volume: 0.3, ..default() });
+	audio.play_with_settings(game_assets.music.clone(), PlaybackSettings { repeat: true, volume: 0.2, ..default() });
 
 	// Plane
 	commands.spawn((
@@ -82,7 +82,7 @@ fn init_world(
 				base_color: Color::WHITE,
 				..default()
 			}),
-			transform: Transform::from_xyz(1.5, 5.0, 1.5),//.with_scale(Vec3::splat(3.0)),
+			transform: Transform::from_xyz(120.5, 5.0, 110.5),//.with_scale(Vec3::splat(3.0)),
 			..default()
 		},
 		RigidBody::Dynamic,

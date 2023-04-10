@@ -90,16 +90,4 @@ fn spawn(
 		]),
 	));
 
-
-
-	// commands.spawn((
-	// 	Name::new("Table"),
-	// 	RigidBody::Fixed,
-	// 	Collider::cuboid(5.0,0.02,0.5),
-	// 	TransformBundle {
-	// 		local: Transform::from_xyz(0.0, -2.5, 0.0),
-	// 		..default()
-	// 	},
-	// 	CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-	// ));
 }

@@ -31,7 +31,7 @@ pub struct OccupiedSpawnSpace(Vec<(Vec2,f32)>);
 #[derive(Component, Clone, Copy)]
 pub struct Shadow;
 
-const ISLAND_SIZE: f32 = 250.0;
+const ISLAND_SIZE: f32 = 200.0;
 
 #[derive(Component, Clone, Debug)]
 pub struct SpawnableInstance {
@@ -46,7 +46,9 @@ fn init_world(
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut standard_mat: ResMut<Assets<StandardMaterial>>,
 	game_assets: Res<GameAssets>,
+	audio: Res<Audio>,
 ) {
+	audio.play_with_settings(game_assets.music.clone(), PlaybackSettings { repeat: true, volume: 0.3, ..default() });
 
 	// Plane
 	commands.spawn((
@@ -145,7 +147,7 @@ fn spawn_spawnables(
 		VisibilityBundle::default(),
 	)).id();
 
-	for _ in 0..12000 {
+	for _ in 0..8000 {
 		let Some((spawnable_handle,spawnable)) = choose_spawnable.get_random(&mut rng) else {
 			warn!("Couldn't randomly choose spawnable from assets!");
 			continue;
@@ -155,7 +157,7 @@ fn spawn_spawnables(
 
 		//let position = Vec2::new(rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE), rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE));
 
-		let is_rare = rng.gen_bool(1.0/500.0);
+		let is_rare = rng.gen_bool(1.0/200.0);
 
 		let relative_scale = if is_rare {
 			rng.gen_range(1.35..1.8)
@@ -203,12 +205,12 @@ fn spawn_spawnables(
 				},
 				SpawnableArchetype::Bush => {
 					entity.insert((
-						Ingredient::generate_random_ingredient(&mut rng, IngredientType::Berry, is_rare, color),
+						Ingredient::generate_random_ingredient(&mut rng, IngredientType::Berry, is_rare, color, relative_scale),
 					));
 				},
 				SpawnableArchetype::Mushroom => {
 					entity.insert((
-						Ingredient::generate_random_ingredient(&mut rng, IngredientType::Mushroom, is_rare, color),
+						Ingredient::generate_random_ingredient(&mut rng, IngredientType::Mushroom, is_rare, color, relative_scale),
 					));
 				},
 			}

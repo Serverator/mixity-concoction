@@ -1,3 +1,5 @@
+
+
 use crate::prelude::*;
 use bevy::{gltf::Gltf, render::{once_cell::sync::OnceCell, view::RenderLayers}, scene::SceneInstance, reflect::TypeUuid};
 pub use bevy_asset_loader::prelude::*;
@@ -27,6 +29,7 @@ impl Plugin for AssetLoadingPlugin {
 pub struct CalculatedColliders {
     pub cauldron_collider: Collider,
     pub mortar_collider: Collider,
+    pub potions: Vec<Collider>,
 }
 
 pub static SHADOW_BUNDLE: OnceCell<(Handle<StandardMaterial>,Handle<Mesh>)> = OnceCell::new();
@@ -66,7 +69,7 @@ fn setup(
             archetype: SpawnableArchetype::Tree,
             scene: scene.clone(),
             ingredient: None,
-            spawn_weight: 1.5 / tree_scenes.len() as f32,
+            spawn_weight: 1.2 / tree_scenes.len() as f32,
             size: 2.8,
             collider: Some(Collider::capsule(Vec3::ZERO, Vec3::Y * 2.0, 0.4)),
         };
@@ -93,7 +96,7 @@ fn setup(
             spawn_weight: match i { 
                 2 => 0.3,
                 _ => 1.0,
-            } / tree_scenes.len() as f32,
+            } / bush_scenes.len() as f32,
             size: match i {
                 0 => 1.5,
                 _ => 2.0,   
@@ -132,7 +135,7 @@ fn setup(
                     
                 }, 
             }),
-            spawn_weight: 0.4 / ingredient_scenes.len() as f32,
+            spawn_weight: 0.3 / ingredient_scenes.len() as f32,
             size: 0.6,
             collider: None,
         };
@@ -140,11 +143,12 @@ fn setup(
     }
 
     // YES I DO IT AT RUNTIME, NO TIME TO FIX BUCK OFF
+    // SERDE DOES NOT WANT TO COOPERATE, SO YOU'LL HAVE TO WAIT 10 SECONDS OF LOADING SCREEN
     commands.insert_resource(CalculatedColliders {
         cauldron_collider: compute_collider(&game_assets.cauldron_scene, &scene_assets, &mesh_assets, Some("Cauldron")),
         mortar_collider: compute_collider(&game_assets.mortar_scene, &scene_assets, &mesh_assets, None),
-        //player_head_collider: compute_collider(&game_assets.player_head_scene, &scene_assets, &mesh_assets, Some("Collider"))
-    })
+        potions: gltfs.get(&game_assets.potions_gltf).unwrap().scenes.iter().map(|s| compute_collider(s, &scene_assets, &mesh_assets, None)).collect(),
+    });
 }
 
 #[derive(Clone, Debug, Default)]
@@ -249,6 +253,8 @@ pub struct GameAssets {
     pub mushrooms_gltf: Handle<Gltf>,
     #[asset(path = "models/floating_island.gltf#Scene0")]
     pub floating_island_scene: Handle<Scene>,
+    #[asset(path = "models/arrow.gltf#Scene0")]
+    pub arrow_scene: Handle<Scene>,
     // Inventory spawnables
     #[asset(path = "models/backpack.gltf")]
     pub backpack_gltf: Handle<Gltf>,
@@ -273,9 +279,18 @@ pub struct GameAssets {
     pub player_scene: Handle<Scene>,
     #[asset(path = "models/player.gltf#Scene0")]
     pub player_head_scene: Handle<Scene>,
+    // Music-ish
+    #[asset(path = "sounds/music.ogg")]
+    pub music: Handle<AudioSource>,
     // Sounds
-    #[asset(path = "sounds/pickup.ogg")]
-    pub pickup_sound: Handle<AudioSource>,
+    #[asset(paths("sounds/pickup.ogg", "sounds/pickup2.ogg", "sounds/pickup3.ogg", "sounds/pickup4.ogg"), collection(typed))]
+    pub pickup_sound: Vec<Handle<AudioSource>>,
+    #[asset(path = "sounds/insanity.ogg")]
+    pub insanity_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/drink.ogg")]
+    pub drink_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/wha.ogg")]
+    pub wha_sound: Handle<AudioSource>,
     #[asset(path = "sounds/item_drop.ogg")]
     pub drop_item_sound: Handle<AudioSource>,
     #[asset(path = "sounds/eat.ogg")]
@@ -290,6 +305,8 @@ pub struct GameAssets {
     pub rare_sound: Handle<AudioSource>,
     #[asset(path = "sounds/delishs.ogg")]
     pub delishs_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/filling_potion.ogg")]
+    pub filling_potion_sound: Handle<AudioSource>,
     #[asset(paths("sounds/grind_1.ogg", "sounds/grind_2.ogg", "sounds/grind_3.ogg", "sounds/grind_4.ogg"), collection(typed))]
     pub grind_sound: Vec<Handle<AudioSource>>,
 }

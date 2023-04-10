@@ -1,3 +1,4 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![allow(clippy::type_complexity)]
 #![allow(clippy::too_many_arguments)]
 
@@ -56,6 +57,7 @@ pub mod prelude {
 	pub use rand::prelude::*;
 	pub use std::f32::consts::PI;
 	pub use smallvec::*;
+
 	
 	pub use crate::helper::*;
 	pub use crate::assets::GameAssets;

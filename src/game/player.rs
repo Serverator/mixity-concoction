@@ -1,7 +1,8 @@
-use crate::{prelude::*, assets::SHADOW_BUNDLE};
+use crate::{prelude::*, assets::SHADOW_BUNDLE, game::effects::EffectType};
 use bevy::{core_pipeline::fxaa::Fxaa, math::Vec3Swizzles, gltf::Gltf};
+use bevy_inspector_egui::egui::lerp;
 
-use super::{effects::ActiveEffects, backpack::Inventory, world::Shadow, items::DroppedItem};
+use super::{effects::ActiveEffects, backpack::Inventory, world::Shadow};
 
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
@@ -16,8 +17,7 @@ impl Plugin for PlayerPlugin {
 				camera_follow,
 					).chain().in_set(OnUpdate(GameState::InGame))
 			)
-			.register_type::<Inventory>()
-			.register_type::<ActiveEffects>();
+			.register_type::<Inventory>();
 	}
 }
 
@@ -37,7 +37,6 @@ pub fn spawn_player(
 		Name::new("Player"),
 		Player,
 		Inventory::default(),
-		ActiveEffects::default(),
 		SceneBundle {
 			scene: game_assets.player_scene.clone(),
 			transform: Transform::from_scale(Vec3::splat(1.2)),
@@ -122,9 +121,10 @@ pub fn move_player(
 	mut desired_rotation: Local<Quat>,
 	mut current_translation: Local<Vec2>,
 	mut desired_translation: Local<Vec2>,
+	effects: Res<ActiveEffects>,
 	time: Res<Time>,
 ) {
-	const BASE_PLAYER_SPEED: f32 = 10.0;
+	const BASE_PLAYER_SPEED: f32 = 8.0;
 
 	let (Ok((mut controller, input, mut transform)), Ok(camera_transform)) = (player_query.get_single_mut(),cam_query.get_single()) else {
 		return;
@@ -152,7 +152,12 @@ pub fn move_player(
 	transform.rotation = Quat::slerp(transform.rotation, *desired_rotation, (1.0 - 0.0000001f64.powf(time.delta_seconds_f64())) as f32);
 	*current_translation = Vec2::lerp(*current_translation, *desired_translation, (1.0 - 0.0000001f64.powf(time.delta_seconds_f64())) as f32);
 	let existing_translation = controller.translation.unwrap_or_default();
-	controller.translation = Some(existing_translation + current_translation.extend(-0.2).xzy() * BASE_PLAYER_SPEED * time.delta_seconds());
+
+	let speed_modifiers = 
+		effects.has_effect(EffectType::Haste).map(|a| lerp(1.2..=2.0, a.potency)).unwrap_or(1.0)
+	  * effects.has_effect(EffectType::Slowness).map(|a| lerp(0.9..=0.6, a.potency)).unwrap_or(1.0);
+
+	controller.translation = Some(existing_translation + current_translation.extend(-0.2).xzy() * BASE_PLAYER_SPEED * speed_modifiers * time.delta_seconds());
 }
 
 pub fn camera_follow(
@@ -188,8 +193,6 @@ pub fn camera_follow(
 		const WHEEL_SENSITIVITY: f32 = 1.0 / 15.0;
 		distance.0 = (distance.0 - wheel_delta.y() * WHEEL_SENSITIVITY ).clamp(0.0, 1.0);
 	}
-	
-	
 
 	// Move camera with mouse motion
 	if input.pressed(Action::ActivateLook) {
@@ -199,7 +202,7 @@ pub fn camera_follow(
 	}
 
 	camera_transform.rotation = Quat::from_euler(EulerRot::YXZ, y_rot, lerp(-PI/7.5,-PI/4.5,distance.0.powi(2)), 0.0);
-	camera_transform.translation = *looking_pos + Quat::from_rotation_y(y_rot) * Vec3::Z * 4.0 + camera_transform.back() * lerp(7.0, 45.0, distance.0.powi(2)) + Vec3::Y * lerp(1.5, 0.0, distance.0.powi(2));
+	camera_transform.translation = *looking_pos + Quat::from_rotation_y(y_rot) * Vec3::Z * 1.0 + camera_transform.back() * lerp(7.0, 45.0, distance.0.powi(2)) + Vec3::Y * lerp(1.5, 0.0, distance.0.powi(2));
 
 	fn lerp(from: f32, to: f32, t: f32) -> f32 {
 		t * to + from * (1.0 - t)

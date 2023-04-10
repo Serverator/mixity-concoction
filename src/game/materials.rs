@@ -82,8 +82,8 @@ impl Material for FoliageMaterial {
 
 #[derive(Clone, Reflect, FromReflect, Default, Debug)]
 pub struct NamedMaterial {
-	name: Cow<'static, str>,
-	material: FoliageMaterial,
+	pub name: Cow<'static, str>,
+	pub material: FoliageMaterial,
 }
 
 impl NamedMaterial {

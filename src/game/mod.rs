@@ -26,6 +26,7 @@ impl Plugin for GamePlugin {
 			.add_plugin(backpack::BackpackPlugin)
 			.add_plugin(alchemy::AlchemyPlugin)
 			.add_plugin(items::ItemsPlugin)
+			.add_plugin(effects::EffectsPlugin)
 			.register_type::<Ingredient>();
 	}
 }

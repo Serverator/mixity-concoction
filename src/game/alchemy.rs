@@ -1,8 +1,8 @@
-use bevy::{render::{view::RenderLayers}, math::{Vec4Swizzles, Vec3Swizzles}, transform::commands};
+use bevy::{render::{view::RenderLayers}, math::{Vec4Swizzles, Vec3Swizzles}, gltf::Gltf};
 
 use crate::{prelude::*, assets::{CalculatedColliders, SceneInstanceReady}};
 
-use super::{items::{Item, ItemSize, Grabber, DroppedItem, Potion}, backpack::InventoryCamera, ingredient::{Ingredient, Grind}, effects::Effect};
+use super::{items::{Item, ItemSize, Grabber, DroppedItem, Potion}, backpack::InventoryCamera, ingredient::{Ingredient, Grind}, effects::{ActiveEffects, generate_qp_from_ingredients, generate_effects_from_qp}};
 
 pub struct AlchemyPlugin;
 impl Plugin for AlchemyPlugin {
@@ -23,6 +23,7 @@ impl Plugin for AlchemyPlugin {
 			consume_cauldroned.after(check_cauldroned),
 			mash_ingredient,
 			change_color,
+			spawn_new_bottle,
 				).in_set(OnUpdate(GameState::InGame))
 		)
 		.register_type::<Mortar>()
@@ -46,7 +47,7 @@ pub struct Mortar(bool);
 pub struct Pestle;
 
 #[derive(Component, Default, Reflect)]
-pub struct Cauldron(SmallVec<[Ingredient;6]>);
+pub struct Cauldron(SmallVec<[Ingredient;4]>);
 
 #[derive(Component)]
 pub struct PlayerHead;
@@ -72,6 +73,7 @@ fn init_alchemy_table(
 	mut commands: Commands,
 	game_assets: Res<GameAssets>,
 	calculated_colliders: Res<CalculatedColliders>,
+	gltfs: Res<Assets<Gltf>>,
 ) {
 	// Alchemy table
 	commands.spawn((
@@ -80,7 +82,7 @@ fn init_alchemy_table(
 		RigidBody::KinematicPositionBased,
 		SceneBundle {
 			scene: game_assets.table_scene.clone(),
-			transform: Transform::from_xyz(5.0, -1.0, 0.0).with_scale(Vec3::splat(3.0)),
+			transform: Transform::from_xyz(5.0, -3.0, 0.0).with_scale(Vec3::splat(3.0)),
 			..default()
 		},
 		Restitution::new(0.2),
@@ -93,7 +95,7 @@ fn init_alchemy_table(
 	commands.spawn((
 		Mortar(false),
 		Name::new("Mortar"),
-		Item::Alchemy,
+		Item::AlchemyTool,
 		ItemSize::new(2.5,false),
 		RigidBody::Dynamic,
 		Velocity::default(),
@@ -118,7 +120,7 @@ fn init_alchemy_table(
 	commands.spawn((
 		Pestle,
 		Name::new("Pestle"),
-		Item::Alchemy,
+		Item::AlchemyTool,
 		ItemSize::new(2.5,false),
 		RigidBody::Dynamic,
 		Velocity::default(),
@@ -143,7 +145,7 @@ fn init_alchemy_table(
 		Pestle,
 		Name::new("Cauldron"),
 		Cauldron::default(),
-		Item::Alchemy,
+		Item::AlchemyTool,
 		ItemSize::new(2.5,false),
 		RigidBody::Dynamic,
 		Velocity::default(),
@@ -188,11 +190,40 @@ fn init_alchemy_table(
 		//CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
 	));
 
+	spawn_empty_bottle(&mut commands, &game_assets, &gltfs, &calculated_colliders);
+}
+
+pub fn spawn_empty_bottle(commands: &mut Commands, game_assets: &GameAssets, gltfs: &Assets<Gltf>, colliders: &CalculatedColliders) {
+
+	let gltf = gltfs.get(&game_assets.potions_gltf).unwrap();
+	let mut rng = thread_rng();
+	let i = rng.gen_range(0..gltf.scenes.len());
+
+	let potion = &gltf.scenes[i];
+	let collider = colliders.potions[i].clone();
+
 	commands.spawn((
-		Name::new("Potion"),
+		Name::new("Potion Bottle"),
+		SceneBundle {
+			scene: potion.clone(),
+			transform: Transform::from_xyz(4.0, 6.0, 0.0),
+			..default()
+		},
 		Item::Potion(Potion::Empty),
-
-
+		RigidBody::Dynamic,
+		collider,
+		LockedAxes::TRANSLATION_LOCKED_Z,
+		Damping {
+			angular_damping: 0.5,
+			linear_damping: 0.5,
+		},
+		NamedMaterials(smallvec![
+			NamedMaterial::new("Potion",Color::rgb(0.8, 0.8, 0.95)),
+			NamedMaterial::new("Cork",Color::rgb(0.6,0.4,0.0)),
+		]),
+		SecondWorldBundle::default(),
+		ItemSize::new(1.0, false),
+		Velocity::default(),
 	));
 }
 
@@ -306,6 +337,7 @@ fn consume_eaten(
 	time: Res<Time>,
 	game_assets: Res<GameAssets>,
 	sound: Res<Audio>,
+	mut active_effects: ResMut<ActiveEffects>,
 ) {
 	if eaten_query.is_empty() { return; }
 
@@ -317,7 +349,7 @@ fn consume_eaten(
 
 		if item_size.current_size() < 0.08 {
 			match item {
-    			Item::Alchemy => {
+    			Item::AlchemyTool => {
 					commands.entity(entity)
 						.remove::<ColliderDisabled>()
 						.remove::<Eaten>();
@@ -339,13 +371,37 @@ fn consume_eaten(
 					
 				},
     			Item::Potion(potion) => {
-					
+
+					if let Potion::Filled { ingridients, color: _ } = potion {
+						let (quality,purity) = generate_qp_from_ingredients(ingridients);
+						let effects = generate_effects_from_qp(quality,purity);
+
+						for effect in effects {
+							active_effects.0.push(effect);
+						}
+						sound.play(game_assets.drink_sound.clone());
+					}
+
+					commands.entity(entity)
+						.despawn_recursive();
 				},
 				
 			}
 		} else {
 			transform.translation = Vec3::lerp(transform.translation, head_transform.translation, (1.0 - 0.0001f64.powf(time.delta_seconds_f64())) as f32)
 		}
+	}
+}
+
+fn spawn_new_bottle(
+	mut commands: Commands,
+	game_assets: Res<GameAssets>,
+	gltfs: Res<Assets<Gltf>>,
+	calculated_colliders: Res<CalculatedColliders>,
+	potion: Query<&Item, Without<DroppedItem>>,
+) {
+	if potion.iter().filter(|a| matches!(a, Item::Potion(Potion::Empty))).count() == 0 {
+		spawn_empty_bottle(&mut commands, &game_assets, &gltfs, &calculated_colliders);
 	}
 }
 
@@ -374,11 +430,12 @@ fn change_color(
 fn consume_cauldroned(
 	mut commands: Commands,
 	mut cauldron_single: Query<(&GlobalTransform, &mut Cauldron)>,
-	mut cauldroned_query: Query<(Entity, &mut ItemSize, &mut Transform, &Item), (With<Cauldroned>, Without<Cauldron>)>,
+	mut cauldroned_query: Query<(Entity, &mut ItemSize, &mut Transform, &mut Item, Option<&mut NamedMaterials>), (With<Cauldroned>, Without<Cauldron>)>,
 	ingridient_query: Query<&Ingredient, (Without<DroppedItem>, With<Item>)>,
 	time: Res<Time>,
-	game_assets: Res<GameAssets>,
-	sound: Res<Audio>,
+	_cauldron_mat: Option<Res<CauldronLiquidMaterial>>,
+	_game_assets: Res<GameAssets>,
+	_sound: Res<Audio>,
 ) {
 	if cauldroned_query.is_empty() { return; }
 
@@ -386,11 +443,11 @@ fn consume_cauldroned(
 
 	let cauldron_pos = cauldron_transform.compute_matrix().mul_vec4(Vec4::new(0.0,0.3,0.0,1.0)).xyz();
 
-	for (entity, mut item_size, mut transform, item) in &mut cauldroned_query {
+	for (entity, mut item_size, mut transform, mut item, named_mats) in &mut cauldroned_query {
 
 		if item_size.current_size() < 0.08 {
-			match item {
-    			Item::Alchemy => {
+			match item.as_mut() {
+    			Item::AlchemyTool => {
 					commands.entity(entity)
 						.remove::<ColliderDisabled>()
 						.remove::<Cauldroned>();
@@ -409,7 +466,31 @@ fn consume_cauldroned(
 						.despawn_recursive();
 				},
     			Item::Potion(potion) => {
-					
+
+					commands.entity(entity)
+						.remove::<ColliderDisabled>()
+						.remove::<Cauldroned>();
+					item_size.shrinking = false;
+
+					let color = if cauldron.0.is_empty() {
+						Vec3::new(0.6, 0.8, 0.97)
+					} else {
+						cauldron.0.iter().map(|i| Vec4::from(i.color.as_rgba_f32()).xyz()).sum::<Vec3>() / cauldron.0.len() as f32
+					};
+				
+					let color = Color::rgb(color.x, color.y, color.z);
+
+					// This is so bad, I'm so so sorry
+					// I don't even know how half of my code works myself..
+					named_mats.unwrap().0[0].material.color = color;
+
+					let mut new_vec = smallvec![];
+					std::mem::swap(&mut new_vec, &mut cauldron.0);
+
+					*potion = Potion::Filled { 
+						ingridients: new_vec, 
+						color, 
+					};
 				},
 			}
 		} else {
@@ -417,7 +498,6 @@ fn consume_cauldroned(
 		}
 	}
 }
-
 
 fn check_eaten(
 	mut commands: Commands,
@@ -462,20 +542,21 @@ fn check_eaten(
 // Why another system? Cauldon ate itself and made a hole in space time. (Too lazy to fix)
 fn check_cauldroned(
 	mut commands: Commands,
-	cauldron_query: Query<(&GlobalTransform, &CenterOfMass) ,With<Cauldron>>,
-	mut item_query: Query<(Entity, &GlobalTransform, &mut ItemSize, &CenterOfMass), (With<Item>, Without<Cauldron>, Without<Eaten>, Without<Cauldroned>, Without<DroppedItem>)>,
+	cauldron_query: Query<&GlobalTransform ,With<Cauldron>>,
+	mut item_query: Query<(Entity, &GlobalTransform, &mut ItemSize, &CenterOfMass, &Item, &mut Velocity), (Without<Cauldron>, Without<Eaten>, Without<Cauldroned>, Without<DroppedItem>)>,
 	mut grabber_query: Query<&mut Grabber>,
 	game_assets: Res<GameAssets>,
 	sound: Res<Audio>,
+	time: Res<Time>,
 ) {
 	let mut grabber = grabber_query.single_mut();
-	let Ok((cauldron_gt,cauldron_com)) = cauldron_query.get_single() else { return; };
-	let cauldron_pos = cauldron_gt.compute_matrix().mul_vec4(Vec4::new(0.0,0.45,0.0,1.0)).xyz();
+	let Ok(cauldron_gt) = cauldron_query.get_single() else { return; };
+	let cauldron_pos =  cauldron_gt.compute_matrix().mul_vec4(Vec4::new(0.0,0.45,0.0,1.0)).xyz();
 
-	for (item_entity, global_transform, mut item_size, local_com) in &mut item_query {
-
+	for (item_entity, global_transform, mut item_size, local_com, item, mut velocity) in &mut item_query {
+		
+		 
 		let global_com = global_transform.compute_matrix().mul_vec4(local_com.0.extend(1.0)).xyz();
-
 
 		let relative_vector = cauldron_pos.xy().extend(0.0) - global_com.xy().extend(0.0);
 		let length = relative_vector.length_squared();
@@ -483,6 +564,14 @@ fn check_cauldroned(
 		if length > 0.50 { // || (relative_vector.y < 0.0 && length > 0.4) {
 			continue;
 		}
+
+		match item {
+    		Item::Potion(Potion::Filled {..}) | Item::AlchemyTool => {
+				velocity.linvel += cauldron_gt.up() * time.delta_seconds() * 12.0;
+				return;
+			},
+			_ => ()
+		};
 	
 		if grabber.grabbed_entity == Some(item_entity) {
 			grabber.ungrab = true;
@@ -495,20 +584,23 @@ fn check_cauldroned(
 			.insert(ColliderDisabled)
 			.insert(Velocity::zero());
 		item_size.shrinking = true;
-	
-		sound.play(game_assets.sploosh_sound.clone());
+
+		if let Item::Potion(_) = item { 
+			sound.play(game_assets.filling_potion_sound.clone());
+		} else {
+			sound.play(game_assets.sploosh_sound.clone());
+		}
+
 		continue;
 	}
 }
 
-
-
 fn check_mortar_crushing(
 	mut mortar_query: Query<(&GlobalTransform, &mut Mortar)>,
 	pestle_query: Query<(&GlobalTransform, &Velocity, &CenterOfMass), With<Pestle>>,
-	time: Res<Time>,
+	_time: Res<Time>,
 ) {
-	const MORTAR_RADIUS: f32 = 0.3;
+	const MORTAR_RADIUS: f32 = 0.4;
 
 	for (mortar_transfrom, mut mortar) in &mut mortar_query {
 		let mut is_crushing = false;
@@ -526,7 +618,7 @@ fn check_mortar_crushing(
 			let peslte_relative_translation = (mortar_transfrom.compute_matrix().inverse() * world_com).xyz();
 
 			// Check if pestle is located within mortar radius
-			if !(0.05..0.55).contains(&peslte_relative_translation.y) || peslte_relative_translation.xz().length_squared() > MORTAR_RADIUS.powi(2) {
+			if !(0.00..0.65).contains(&peslte_relative_translation.y) || peslte_relative_translation.xz().length_squared() > MORTAR_RADIUS.powi(2) {
 				continue;
 			}
 
@@ -562,7 +654,7 @@ fn mash_ingredient(
 						sound.play(game_assets.grind_sound.choose(&mut thread_rng()).unwrap().clone());
 					}
 	
-					if *amount > 0.4 {
+					if *amount > 0.35 {
 						commands.entity(entity)
 							.insert(game_assets.crushed_ingredient_scene.clone())
 							.insert(NamedMaterials(smallvec![NamedMaterial::new("Mashed", ingredient.color)]))

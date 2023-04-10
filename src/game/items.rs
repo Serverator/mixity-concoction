@@ -3,7 +3,7 @@ use bevy_inspector_egui::egui::lerp;
 
 use crate::{prelude::*, assets::{Spawnable, PickUpEvent, SceneInstanceReady}};
 
-use super::{ingredient::Ingredient, world::SpawnableInstance, player::Player, backpack::InventoryCamera, effects::Effect};
+use super::{ingredient::Ingredient, world::SpawnableInstance, player::Player, backpack::InventoryCamera, effects::{EffectType, ActiveEffects}};
 
 // #[derive(Default, Component, Debug, Clone, Copy)]
 // pub struct InventoryItem {
@@ -58,19 +58,18 @@ impl ItemSize {
 
 #[derive(Component, Debug, Clone, Reflect, FromReflect)]
 pub enum Item {
-	Alchemy,
+	AlchemyTool,
 	Ingredient,
 	Potion(Potion),
 }
 
-#[derive(Component, Default, Clone, Reflect, FromReflect, Debug)]
+#[derive(Default, Clone, Reflect, FromReflect, Debug)]
 pub enum Potion {
 	#[default]
 	Empty,
 	Filled {
-		ingridients: SmallVec<[Ingredient;6]>,
+		ingridients: SmallVec<[Ingredient;4]>,
 		color: Color,
-		effects: SmallVec<[Effect;2]>
 	},
 }
 
@@ -180,7 +179,7 @@ fn drop_items(
 	mut inventory_item_query: Query<(Entity, &mut Transform, &Item, &mut ItemSize, &mut Velocity), (Without<Player>, Without<DroppedItem>)>,
 	mut grabber_query: Query<&mut Grabber>,
 	player_query: Query<&Transform, With<Player>>,
-	potion_query: Query<&Potion>,
+	_potion_query: Query<&Item>,
 	//transform_query: Query<&Transform, Without<Item>>,
 	game_assets: Res<GameAssets>,
 	sound: Res<Audio>,
@@ -195,7 +194,7 @@ fn drop_items(
 		let mut rng = thread_rng();
 
 		match item {
-    		Item::Alchemy => {
+    		Item::AlchemyTool | Item::Potion(Potion::Empty) => {
 				*velocity = Velocity::default();
 				
 				item_size.reset();
@@ -205,7 +204,7 @@ fn drop_items(
 
 				//transform.scale = Vec3::splat(0.01);
 			},
-    		Item::Ingredient => {
+    		Item::Ingredient | Item::Potion(Potion::Filled { .. }) => {
 				let player_translation = player_query.single().translation;
 		
 				*velocity = Velocity {
@@ -225,9 +224,6 @@ fn drop_items(
 				sound.play(game_assets.drop_item_sound.clone());
 				//transform.scale = Vec3::splat(0.01);
 			},
-			Item::Potion(potion) => {
-				todo!()
-			}
 		}		
 	}
 }
@@ -241,6 +237,8 @@ pub fn pickup_entity(
 	child_query: Query<&Children>,
 	spawnables: Res<Assets<Spawnable>>,
 	game_assets: Res<GameAssets>,
+	active_effects: Res<ActiveEffects>,
+	mut hallucination_message: Local<bool>,
 	sound: Res<Audio>,
 ) {
 	let Ok((player_transform, input)) = player_query.get_single() else {
@@ -286,6 +284,22 @@ pub fn pickup_entity(
 			};
 		
 			let ingredient_info = spawnable.ingredient.as_ref().unwrap();
+
+			// Hallucinations
+			if let Some(hallucination) = active_effects.has_effect(EffectType::Hallucinations) {
+				let mut rng = thread_rng();
+				if rng.gen_bool(lerp(0.2..=0.5,hallucination.potency as f64)) {
+					commands.entity(entity).despawn_recursive();
+					if !*hallucination_message {
+						sound.play(game_assets.insanity_sound.clone());
+						*hallucination_message = true;
+					} else if rng.gen_bool(0.1) {
+						sound.play(game_assets.wha_sound.clone());
+					}
+					return;
+				}
+				
+			}
 		
 			// Do something to original entity
 			match &ingredient_info.pick_event {
@@ -303,7 +317,7 @@ pub fn pickup_entity(
 		
 					for (child,child_name) in child_query.iter_descendants(entity).filter_map(|child| finder_query.get(child).ok()) {
 						if child_name.contains(name) {
-							commands.entity(child).despawn_recursive();
+							commands.entity(child).despawn();
 						}
 					}
 				},
@@ -336,7 +350,7 @@ pub fn pickup_entity(
     			},
 			));
 
-			sound.play(game_assets.pickup_sound.clone());
+			sound.play(game_assets.pickup_sound.choose(&mut rng).unwrap().clone());
 
 			if ingredient.is_rare {
 				sound.play(game_assets.rare_sound.clone());
@@ -348,6 +362,20 @@ pub fn pickup_entity(
 			};
 
 			let mut rng = thread_rng();
+
+			// Hallucinations
+			if let Some(hallucination) = active_effects.has_effect(EffectType::Hallucinations) {
+				if rng.gen_bool(lerp(0.2..=0.5,hallucination.potency as f64)) {
+					commands.entity(entity).despawn_recursive();
+					if !*hallucination_message {
+						sound.play(game_assets.insanity_sound.clone());
+						*hallucination_message = true;
+					} else if rng.gen_bool(0.1) {
+						sound.play(game_assets.wha_sound.clone());
+					}
+					return;
+				}
+			}
 
 			*velocity = Velocity {
 				angvel: Vec3 { x: rng.gen_range(-5.0..5.0), y: rng.gen_range(-5.0..5.0), z: rng.gen_range(-5.0..5.0) },
@@ -364,14 +392,14 @@ pub fn pickup_entity(
 			transform.translation = Vec3::new(rng.gen_range(-0.5..0.5), 2.0 + rng.gen_range(-0.5..0.5), 0.0);
 			//transform.scale = Vec3::splat(0.01);
 
-			sound.play(game_assets.pickup_sound.clone());
+			sound.play(game_assets.pickup_sound.choose(&mut rng).unwrap().clone());
 		}
 	}
 }
 
 fn move_grabber (
 	windows: Query<&Window>,
-	rapier_context: Res<RapierContext>,
+	_rapier_context: Res<RapierContext>,
 	inventory_camera: Query<(&GlobalTransform, &Camera), With<InventoryCamera>>,
 	mut grabber: Query<(&Transform, &mut Velocity, &Grabber)>,	
 ) {

@@ -23,17 +23,25 @@ impl Plugin for AssetLoadingPlugin {
     }
 } 
 
+#[derive(Resource)]
+pub struct CalculatedColliders {
+    pub cauldron_collider: Collider,
+    pub mortar_collider: Collider,
+}
+
 pub static SHADOW_BUNDLE: OnceCell<(Handle<StandardMaterial>,Handle<Mesh>)> = OnceCell::new();
 
 pub static DEFAULT_FOLIAGE: OnceCell<Handle<FoliageMaterial>> = OnceCell::new();
 
+
 fn setup(
+    mut commands: Commands,
     mut spawnable_assets: ResMut<Assets<Spawnable>>,
 	mut mesh_assets: ResMut<Assets<Mesh>>,
 	mut material_assets: ResMut<Assets<StandardMaterial>>,
     mut foliage_assets: ResMut<Assets<FoliageMaterial>>,
-	assets: Res<GameAssets>,
-    _scenes: Res<Assets<Scene>>,
+	game_assets: Res<GameAssets>,
+    scene_assets: Res<Assets<Scene>>,
     gltfs: Res<Assets<Gltf>>,
 ) {
     DEFAULT_FOLIAGE.set(foliage_assets.add(FoliageMaterial::default())).unwrap();
@@ -41,7 +49,7 @@ fn setup(
 	let plane_mesh = mesh_assets.add(Mesh::from(shape::Plane { size: 1.0, subdivisions: 0 }));
 
 	let shadow_material = material_assets.add(StandardMaterial {
-		base_color_texture: Some(assets.circle_texture.clone()),
+		base_color_texture: Some(game_assets.circle_texture.clone()),
 		alpha_mode: AlphaMode::Mask(0.5),
         base_color: Color::rgb(0.6 * 0.9, 0.8 * 0.9, 0.2 * 0.9),
         unlit: true,
@@ -50,9 +58,7 @@ fn setup(
 
 	SHADOW_BUNDLE.set((shadow_material,plane_mesh)).unwrap();
 
-    let tree_scenes = &gltfs.get(&assets.tree_gltf).unwrap().scenes;
-    
-    
+    let tree_scenes = &gltfs.get(&game_assets.tree_gltf).unwrap().scenes;
 
     for (i,scene) in tree_scenes.iter().enumerate() {
         let spawnable = Spawnable {
@@ -67,24 +73,37 @@ fn setup(
         spawnable_assets.add(spawnable);
     }
 
-    let bush_scenes = &gltfs.get(&assets.bush_gltf).unwrap().scenes;
+    let bush_scenes = &gltfs.get(&game_assets.bush_gltf).unwrap().scenes;
     for (i,scene) in bush_scenes.iter().enumerate() {
         let spawnable = Spawnable {
             id: i,
             archetype: SpawnableArchetype::Bush,
             scene: scene.clone(),
-            ingredient: None,
-            spawn_weight: 1.0 / tree_scenes.len() as f32,
+            ingredient: match i {
+                2 => Some(SpawnableIngredient {
+                    pick_event: PickUpEvent::RemoveNamedChild("Berry"),
+                    inventory_scene: game_assets.berry_scene.clone(),
+                    collider: Collider::compound(vec![
+                        (Vec3::new(0.0,0.1,0.0),Quat::IDENTITY,Collider::round_cuboid(0.14, 0.08, 0.18, 0.04)),
+                        (Vec3::new(0.0,0.2,0.0),Quat::IDENTITY,Collider::ball(0.1)),
+                    ]),
+                }),
+                _ => None,
+            },
+            spawn_weight: match i { 
+                2 => 0.3,
+                _ => 1.0,
+            } / tree_scenes.len() as f32,
             size: match i {
-                1 => 2.0,
-                _ => 1.5
+                0 => 1.5,
+                _ => 2.0,   
             },
             collider: Some(Collider::capsule(Vec3::ZERO, Vec3::Y * 2.0, 0.2)),
         };
         spawnable_assets.add(spawnable);
     }
 
-    let ingredient_scenes = &gltfs.get(&assets.ingredients_gltf).unwrap().scenes;
+    let ingredient_scenes = &gltfs.get(&game_assets.mushrooms_gltf).unwrap().scenes;
     for (i,scene) in ingredient_scenes.iter().enumerate() {     
 
         let spawnable = Spawnable {
@@ -94,18 +113,38 @@ fn setup(
             ingredient: Some(SpawnableIngredient { 
                 pick_event: PickUpEvent::Destroy,
                 inventory_scene: scene.clone(),
-                collider: Collider::compound(vec![
-                    //(Vec3::new(0.0, 0.21, 0.0),Quat::IDENTITY,Collider::ball(0.25)),
-                    (Vec3::new(0.0, 0.36, 0.0),Quat::IDENTITY,Collider::round_cone(0.08, 0.26, 0.04)),
-                    (Vec3::new(0.0, 0.02, 0.0),Quat::IDENTITY,Collider::capsule(Vec3::ZERO,Vec3::Y * 0.26, 0.09)),
-                ]), 
+                collider: match i {
+                    0 => {
+                        Collider::compound(vec![
+                            //(Vec3::new(0.0, 0.21, 0.0),Quat::IDENTITY,Collider::ball(0.25)),
+                            (Vec3::new(0.0, 0.38, 0.0),Quat::IDENTITY,Collider::round_cone(0.08, 0.26, 0.04)),
+                            (Vec3::new(0.0, 0.02, 0.0),Quat::IDENTITY,Collider::capsule(Vec3::ZERO,Vec3::Y * 0.26, 0.09)),
+                        ])
+                    },
+                    1 => {
+                        Collider::compound(vec![
+                            //(Vec3::new(0.0, 0.21, 0.0),Quat::IDENTITY,Collider::ball(0.25)),
+                            (Vec3::new(0.0, 0.44, 0.0),Quat::IDENTITY,Collider::round_cone(0.03, 0.26, 0.04)),
+                            (Vec3::new(0.0, 0.02, 0.0),Quat::IDENTITY,Collider::capsule(Vec3::ZERO,Vec3::Y * 0.30, 0.06)),
+                        ])
+                    },
+                    _ => Collider::default(),
+                    
+                }, 
             }),
-            spawn_weight: 0.5 / ingredient_scenes.len() as f32,
+            spawn_weight: 0.4 / ingredient_scenes.len() as f32,
             size: 0.6,
             collider: None,
         };
         spawnable_assets.add(spawnable);
     }
+
+    // YES I DO IT AT RUNTIME, NO TIME TO FIX BUCK OFF
+    commands.insert_resource(CalculatedColliders {
+        cauldron_collider: compute_collider(&game_assets.cauldron_scene, &scene_assets, &mesh_assets, Some("Cauldron")),
+        mortar_collider: compute_collider(&game_assets.mortar_scene, &scene_assets, &mesh_assets, None),
+        //player_head_collider: compute_collider(&game_assets.player_head_scene, &scene_assets, &mesh_assets, Some("Collider"))
+    })
 }
 
 #[derive(Clone, Debug, Default)]
@@ -115,33 +154,38 @@ pub struct SpawnableIngredient {
     pub collider: Collider,
 }
 
-impl SpawnableIngredient {
-    #[allow(dead_code)]
-    pub fn compute_collider(scene: &Handle<Scene>, scenes: &Assets<Scene>, meshes: &Assets<Mesh>) -> Collider {
-        let scene = scenes.get(scene).unwrap();
-
-        let collider_shape = ComputedColliderShape::ConvexDecomposition(VHACDParameters::default());
-
-        // I WILL NEST AS MUCH SHAPES AS I WANT BITCHES
-
-        let shapes = scene.world
-            .iter_entities()
-            .filter_map(|entity| entity.get::<Handle<Mesh>>())
-            .filter_map(|mesh_handle| meshes.get(mesh_handle))
-            .filter_map(|mesh| Collider::from_bevy_mesh(mesh, &collider_shape))
-            .filter_map(|col| {
-                col.as_compound()
-                .map(|comp| comp.raw.shapes().iter()
-                    .map(|(pos, shape)| {
-                        let (tra, rot) = (*pos).into();
-                        (tra, rot, shape.clone().into())
-                    })   
-                ).map(|a| a.collect::<Vec<_>>())
-            })
-            .fold(vec![], |mut acc, iter| { acc.extend(iter); acc } );
-
-        Collider::compound(shapes)
-    }
+pub fn compute_collider(
+    scene: &Handle<Scene>, 
+    scenes: &Assets<Scene>, 
+    meshes: &Assets<Mesh>,
+    with_name: Option<&'static str>,
+) -> Collider {
+    let scene = scenes.get(scene).unwrap();
+    let collider_shape = ComputedColliderShape::ConvexDecomposition(VHACDParameters::default());
+    // I WILL NEST AS MUCH SHAPES AS I WANT BITCHES
+    let shapes = scene.world
+        .iter_entities()
+        .filter(|entity| {
+            if let Some(with_name) = with_name {
+                entity.get::<Name>().map(|name| name.contains(with_name)).unwrap_or_default()
+            } else {
+                true
+            }
+        })
+        .filter_map(|entity| entity.get::<Handle<Mesh>>())
+        .filter_map(|mesh_handle| meshes.get(mesh_handle))
+        .filter_map(|mesh| Collider::from_bevy_mesh(mesh, &collider_shape))
+        .filter_map(|col| {
+            col.as_compound()
+            .map(|comp| comp.raw.shapes().iter()
+                .map(|(pos, shape)| {
+                    let (tra, rot) = (*pos).into();
+                    (tra, rot, shape.clone().into())
+                })   
+            ).map(|a| a.collect::<Vec<_>>())
+        })
+        .fold(vec![], |mut acc, iter| { acc.extend(iter); acc } );
+    Collider::compound(shapes)
 }
 
 #[allow(dead_code)]
@@ -191,20 +235,63 @@ pub enum SpawnableArchetype {
 
 #[derive(AssetCollection, Resource)]
 pub struct GameAssets {
+    // Textures
 	#[asset(path = "textures/dither.png")]
     pub dither_texture: Handle<Image>,
     #[asset(path = "textures/circle.png")]
     pub circle_texture: Handle<Image>,
+    // World spawnables
     #[asset(path = "models/tree.gltf")]
     pub tree_gltf: Handle<Gltf>,
     #[asset(path = "models/bush.gltf")]
     pub bush_gltf: Handle<Gltf>,
-    #[asset(path = "models/ingredients.gltf")]
-    pub ingredients_gltf: Handle<Gltf>,
+    #[asset(path = "models/mushrooms.gltf")]
+    pub mushrooms_gltf: Handle<Gltf>,
+    #[asset(path = "models/floating_island.gltf#Scene0")]
+    pub floating_island_scene: Handle<Scene>,
+    // Inventory spawnables
     #[asset(path = "models/backpack.gltf")]
     pub backpack_gltf: Handle<Gltf>,
     #[asset(path = "models/potions.gltf")]
     pub potions_gltf: Handle<Gltf>,
+    // Alchemy tools
+    #[asset(path = "models/alchemy.gltf#Scene0")]
+    pub cauldron_scene: Handle<Scene>,
+    #[asset(path = "models/alchemy.gltf#Scene1")]
+    pub mortar_scene: Handle<Scene>,
+    #[asset(path = "models/alchemy.gltf#Scene2")]
+    pub pestle_scene: Handle<Scene>,
+    #[asset(path = "models/alchemy.gltf#Scene3")]
+    // Ingredients
+    pub table_scene: Handle<Scene>,
+    #[asset(path = "models/ingredients.gltf#Scene0")]
+    pub crushed_ingredient_scene: Handle<Scene>,
+    #[asset(path = "models/ingredients.gltf#Scene1")]
+    pub berry_scene: Handle<Scene>,
+    // Player
+    #[asset(path = "models/player.gltf#Scene1")]
+    pub player_scene: Handle<Scene>,
+    #[asset(path = "models/player.gltf#Scene0")]
+    pub player_head_scene: Handle<Scene>,
+    // Sounds
+    #[asset(path = "sounds/pickup.ogg")]
+    pub pickup_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/item_drop.ogg")]
+    pub drop_item_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/eat.ogg")]
+    pub eat_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/sploosh.ogg")]
+    pub sploosh_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/suck_air.ogg")]
+    pub suck_air_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/blah.ogg")]
+    pub blah_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/rare.ogg")]
+    pub rare_sound: Handle<AudioSource>,
+    #[asset(path = "sounds/delishs.ogg")]
+    pub delishs_sound: Handle<AudioSource>,
+    #[asset(paths("sounds/grind_1.ogg", "sounds/grind_2.ogg", "sounds/grind_3.ogg", "sounds/grind_4.ogg"), collection(typed))]
+    pub grind_sound: Vec<Handle<AudioSource>>,
 }
 
 #[derive(Component)]
@@ -227,7 +314,6 @@ pub fn check_scene_init(
 /// Gtlf importer is absolute shite. <br>
 /// To metigate this, I created this little system, that will apply some of the components from the original scene entity to all of it's descendants (With filters) <br>
 /// It janky. It work. It stay.
-#[allow(clippy::type_complexity)]
 pub fn update_scene_children<T: Component + Clone, F: ReadOnlyWorldQuery>(
     mut commands: Commands,
 	children_query: Query<&Children>,
@@ -244,8 +330,8 @@ pub fn update_scene_children<T: Component + Clone, F: ReadOnlyWorldQuery>(
             // Check if T already exists
             if let Some(mut t) = maybe_t {
                 *t = parent_t.clone();
-            } else {
-                commands.entity(child).insert(parent_t.clone());
+            } else if let Some(mut entity_command) = commands.get_entity(child) {
+                entity_command.insert(parent_t.clone());
             }
         }
     }

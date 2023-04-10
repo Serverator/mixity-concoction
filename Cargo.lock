@@ -1793,6 +1793,7 @@ dependencies = [
  "bevy_embedded_assets",
  "bevy_prototype_debug_lines",
  "bevy_rapier3d",
+ "lazy_static",
  "leafwing-input-manager",
  "rand",
  "smallvec",

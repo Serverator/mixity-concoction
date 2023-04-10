@@ -87,73 +87,12 @@ pub struct NamedMaterial {
 }
 
 impl NamedMaterial {
-
 	pub fn new(name: impl Into<Cow<'static, str>>, color: Color) -> Self {
 		NamedMaterial {
     		name: name.into(),
     		material: FoliageMaterial { color, sss: false },
 		}
 	}
-
-	pub fn trunk(is_rare: bool, rng: &mut impl Rng) -> Self {
-		const TRUNK_COLORS: Choices<Color> = choice![
-			Color::rgb(0.5, 0.3, 0.05),
-			Color::rgb(0.55, 0.35, 0.05),
-			Color::rgb(0.45, 0.25, 0.05)
-		];
-
-		let color = if is_rare {
-			Color::rgb(0.85, 0.85, 0.9)
-		} else {
-			*TRUNK_COLORS.random(rng)
-		};
-
-		NamedMaterial::new("Trunk", color)
-	}
-
-	pub fn leaves(is_rare: bool, rng: &mut impl Rng) -> Self {
-		const LEAVES_COLORS: Choices<Color> = choice![
-			Color::LIME_GREEN,
-			Color::YELLOW_GREEN,
-			Color::ORANGE,
-			Color::ORANGE_RED,
-		];
-
-		let color = if is_rare {
-			Color::hsl(rng.gen_range(150.0..330.0), rng.gen_range(0.8..1.0), rng.gen_range(0.4..0.6))
-		} else {
-			*LEAVES_COLORS.random(rng)
-		};
-
-		NamedMaterial {
-    		name: Cow::Borrowed("Leaves"),
-    		material: FoliageMaterial {
-				color,
-				sss: true,
-			}
-		}
-	}
-
-	pub fn mushroom_stem(_is_rare: bool, _rng: &mut impl Rng) -> Self {
-		NamedMaterial {
-    		name: Cow::Borrowed("Stem"),
-    		material: FoliageMaterial {
-				color: Color::rgb(0.8, 0.8, 0.8),
-				sss: true,
-			}
-		}
-	}
-
-	pub fn mushroom_cap(is_rare: bool, rng: &mut impl Rng) -> Self {
-		let color = if is_rare {
-			Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.8..1.0), rng.gen_range(0.45..0.65))
-		} else {
-			Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.5..0.65), rng.gen_range(0.35..0.55))
-		};
-
-    	NamedMaterial::new("Cap", color)
-	}
-
 }
 
 #[derive(Clone, Component, Default, Reflect, Debug)]
@@ -188,29 +127,83 @@ impl NamedMaterials {
 }
 
 impl NamedMaterials {
-	pub fn generate_materials(archetype: SpawnableArchetype, is_rare: bool, rng: &mut impl Rng) -> Self {
+	pub fn generate_materials(archetype: SpawnableArchetype, is_rare: bool, rng: &mut impl Rng) -> (Self, Color) {
 		use SpawnableArchetype::*;
 
-		let mut materials = NamedMaterials::default();
-
-		match archetype {
+		let main_color;
+		
+		let named_materials = match archetype {
     		Tree | Bush => {
-				materials.push(NamedMaterial::leaves(is_rare, rng));
-				materials.push(NamedMaterial::trunk(is_rare, rng));
+				const TRUNK_COLORS: Choices<Color> = choice![
+					Color::rgb(0.5, 0.3, 0.05),
+					Color::rgb(0.55, 0.35, 0.05),
+					Color::rgb(0.45, 0.25, 0.05)
+				];
+		
+				let trunk_color = if is_rare {
+					Color::rgb(0.85, 0.85, 0.9)
+				} else {
+					*TRUNK_COLORS.random(rng)
+				};
+		
+				const LEAVES_COLORS: Choices<Color> = choice![
+					Color::LIME_GREEN,
+					Color::YELLOW_GREEN,
+					Color::ORANGE,
+					Color::ORANGE_RED,
+				];
+		
+				let leaves_color = if is_rare {
+					Color::hsl(rng.gen_range(150.0..330.0), rng.gen_range(0.8..1.0), rng.gen_range(0.4..0.6))
+				} else {
+					*LEAVES_COLORS.random(rng)
+				};
+
+				let berry_color = if is_rare {
+					Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.8..1.0), rng.gen_range(0.45..0.65))
+				} else {
+					Color::hsl(rng.gen_range(190.0..360.0), rng.gen_range(0.5..0.65), rng.gen_range(0.35..0.55))
+				};
+
+
+				main_color = berry_color;
+		
+				NamedMaterials(smallvec![
+					NamedMaterial::new("Trunk", trunk_color),
+					NamedMaterial::new("Berry", berry_color),
+					NamedMaterial { name: Cow::Borrowed("Leaves"), material: FoliageMaterial { color: leaves_color, sss: true } }
+				])
 			},
     		Mushroom => {
-				materials.push(NamedMaterial::mushroom_stem(is_rare, rng));
-				materials.push(NamedMaterial::mushroom_cap(is_rare, rng));
-			},
-		}
 
-		materials
+				let cap_color = if is_rare {
+					Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.8..1.0), rng.gen_range(0.45..0.65))
+				} else {
+					Color::hsl(rng.gen_range(0.0..360.0), rng.gen_range(0.5..0.65), rng.gen_range(0.35..0.55))
+				};
+
+				let stem_color = if is_rare {
+					Color::rgb(0.8, 0.8, 1.0)
+				} else {
+					Color::rgb(0.7, 0.7, 0.7)
+				};
+
+				main_color = cap_color;
+
+				NamedMaterials(smallvec![
+					NamedMaterial::new("Cap", cap_color),
+					NamedMaterial::new("Stem", stem_color),
+				])
+			},
+		};
+
+		(named_materials, main_color)
 	}
 
 
 }
 
-#[allow(clippy::type_complexity)]
+
 pub fn replace_materials(
 	mut commands: Commands,
 	mut material_assets: ResMut<Assets<FoliageMaterial>>,

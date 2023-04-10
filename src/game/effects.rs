@@ -12,6 +12,11 @@ pub struct ActiveEffect {
 	pub effect: Effect,
 	pub time_left: f32, 
 }
+// Arrows
+// Earthquake
+// Backpack backflip
+// Small instruments
+// Invisible ingridients (And you..?)
 
 /// Added to the player to determine active effects
 #[derive(Component, Clone, Debug, Default, Reflect, FromReflect)]

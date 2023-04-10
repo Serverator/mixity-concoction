@@ -3,17 +3,120 @@ use bevy_inspector_egui::egui::lerp;
 
 use crate::{prelude::*, assets::{Spawnable, PickUpEvent, SceneInstanceReady}};
 
-use super::{ingredient::Ingredient, world::SpawnableInstance, player::Player, backpack::InventoryCamera};
+use super::{ingredient::Ingredient, world::SpawnableInstance, player::Player, backpack::InventoryCamera, effects::Effect};
 
-#[derive(Default, Component, Debug, Clone, Copy)]
-pub struct InventoryItem {
-	pub inventory: Option<Entity>,
-	pub size: f32,
-	pub current_size: f32,
+// #[derive(Default, Component, Debug, Clone, Copy)]
+// pub struct InventoryItem {
+// 	pub inventory: Option<Entity>,
+// 	pub size: f32,
+// }
+
+#[derive(Component, Debug, Clone, Copy, Reflect, FromReflect)]
+pub struct ItemSize {
+	pub shrinking: bool,
+	pub size_mult: f32,
+	pub mouth_mult: f32,
+	current_size: f32,
 }
 
-#[derive(Component)]
-pub struct Grabber(pub Option<Entity>);
+impl Default for ItemSize {
+    fn default() -> Self {
+        Self::new(1.0, false)
+    }
+}
+
+impl ItemSize {
+	pub fn new(size_multiplier: f32, shrinking: bool) -> Self {
+		ItemSize {
+			size_mult: size_multiplier,
+			shrinking,
+			mouth_mult: 1.0,
+			current_size: if shrinking { 1.0 * size_multiplier } else { 0.0 }
+		}
+	}
+
+	pub fn reset(&mut self) {
+		self.current_size = if self.shrinking { 
+			1.0 * self.size_mult * self.mouth_mult
+		} else { 
+			0.0
+		}
+	}
+
+	pub fn current_size(&self) -> f32 {
+		self.current_size
+	}
+
+	pub fn desired_size(&self) -> f32 {
+		if self.shrinking {
+			0.01
+		} else {
+			1.0 * self.size_mult * self.mouth_mult
+		}
+	}
+}
+
+#[derive(Component, Debug, Clone, Reflect, FromReflect)]
+pub enum Item {
+	Alchemy,
+	Ingredient,
+	Potion(Potion),
+}
+
+#[derive(Component, Default, Clone, Reflect, FromReflect, Debug)]
+pub enum Potion {
+	#[default]
+	Empty,
+	Filled {
+		ingridients: SmallVec<[Ingredient;6]>,
+		color: Color,
+		effects: SmallVec<[Effect;2]>
+	},
+}
+
+// Thats a chunky boy :)
+#[derive(Bundle, Clone)]
+pub struct InventoryItemBundle {
+	pub scene: Handle<Scene>,
+	pub transform: Transform,
+	pub global_transform: GlobalTransform,
+	pub visibility: Visibility,
+    pub computed_visibility: ComputedVisibility,
+	pub inventory_item: Item,
+	pub item_size: ItemSize,
+	pub locked_axes: LockedAxes,
+	pub rigidbody: RigidBody,
+	pub collider: Collider,
+	pub velocity: Velocity,
+	pub render_layer: RenderLayers,
+	pub collision_group: CollisionGroups,
+}
+
+impl Default for InventoryItemBundle {
+    fn default() -> Self {
+        Self { 
+			scene: Default::default(), 
+			transform: Default::default(), 
+			global_transform: Default::default(), 
+			visibility: Default::default(), 
+			computed_visibility: Default::default(), 
+			inventory_item: Item::Ingredient, 
+			item_size: Default::default(), 
+			locked_axes: LockedAxes::TRANSLATION_LOCKED_Z, 
+			rigidbody: RigidBody::Dynamic,
+			collider: Collider::default(),
+			velocity: Velocity::default(),
+			render_layer: RenderLayers::layer(2), 
+			collision_group: CollisionGroups::new(Group::GROUP_2,Group::GROUP_2), 
+		}
+    }
+}
+
+#[derive(Component, Default)]
+pub struct Grabber {
+	pub grabbed_entity: Option<Entity>,
+	pub ungrab: bool,
+}
 
 #[derive(Default, Component)]
 pub struct DroppedItem;
@@ -27,13 +130,18 @@ impl Plugin for ItemsPlugin {
 					).in_schedule(OnEnter(GameState::InGame))
 			)
 			.add_systems(( // Update in game state
-				drop_items,
-				pickup_entity,
-				item_grab_system,
-				animate_size,
+				pickup_entity,	
 					).in_set(OnUpdate(GameState::InGame))
 			)
-			.add_system(move_grabber.in_base_set(CoreSet::FixedUpdate));
+			.add_systems(( // Update in game state
+				drop_items, 
+				animate_size,
+				item_grab_system,
+					).chain().in_set(OnUpdate(GameState::InGame))
+			)
+			.add_system(move_grabber.in_base_set(CoreSet::FixedUpdate))
+			.register_type::<Item>()
+			.register_type::<ItemSize>();
 	}
 }
 
@@ -41,7 +149,7 @@ fn init(
 	mut commands: Commands,
 ) {
 	commands.spawn((
-		Grabber(None),
+		Grabber::default(),
 		Name::new("Grabber"),
 		TransformBundle::default(),
 		RigidBody::Dynamic,
@@ -57,63 +165,85 @@ fn init(
 }
 
 fn animate_size(
-	mut inventory_item_query: Query<(&mut Transform, &mut InventoryItem)>,
+	mut inventory_item_query: Query<(&mut Transform, &mut ItemSize)>,
 	time: Res<Time>,
 ) {
-	for (mut transform, mut inventory_item) in inventory_item_query.iter_mut().filter(|c| c.1.current_size != 1.0) {
-		inventory_item.current_size = (inventory_item.current_size + time.delta_seconds() * 3.0).min(1.0);
+	for (mut transform, mut item_size) in inventory_item_query.iter_mut() {
+		item_size.current_size = lerp(item_size.current_size..=item_size.desired_size(), (1.0 - 0.0001f64.powf(time.delta_seconds_f64())) as f32);
 
-		transform.scale = Vec3::splat(lerp(0.0..=inventory_item.size, inventory_item.current_size));
+		transform.scale = Vec3::splat(item_size.current_size);
 	}
 }
 
 fn drop_items(
 	mut commands: Commands,
-	mut inventory_item_query: Query<(Entity, &mut Transform, &mut InventoryItem, &mut Velocity)>,
-	transform_query: Query<&Transform, Without<InventoryItem>>,
+	mut inventory_item_query: Query<(Entity, &mut Transform, &Item, &mut ItemSize, &mut Velocity), (Without<Player>, Without<DroppedItem>)>,
+	mut grabber_query: Query<&mut Grabber>,
+	player_query: Query<&Transform, With<Player>>,
+	potion_query: Query<&Potion>,
+	//transform_query: Query<&Transform, Without<Item>>,
+	game_assets: Res<GameAssets>,
+	sound: Res<Audio>,
 ) {
-	for (dropped_item, mut transform, mut inventory_item, mut velocity) in inventory_item_query.iter_mut().filter(|(_,t,_,_)| t.translation.y < -3.0) {
-		let Some(inventory) = inventory_item.inventory else { continue; };
-		info!("Oops dropped an item!");
-		let Ok(parent_transfrom) = transform_query.get(inventory) else {
-			error!("Couldn't find transform for parent entity {:?}! Destroying dropped item...", inventory_item.inventory);
-			commands.entity(dropped_item).despawn();
-			continue;
-		};
+	let mut grabber = grabber_query.single_mut();
+
+	for (dropped_item, mut transform, item, mut item_size, mut velocity) in inventory_item_query.iter_mut().filter(|(_,t,_,_,_)| t.translation.y < -3.0 || t.translation.y > 8.5 || t.translation.x < -4.0) {
+		if grabber.bypass_change_detection().grabbed_entity == Some(dropped_item) {
+			grabber.ungrab = true;
+		}
 
 		let mut rng = thread_rng();
 
-		*velocity = Velocity {
-			angvel: Vec3 { x: rng.gen_range(-8.0..8.0), y: rng.gen_range(-8.0..8.0), z: rng.gen_range(-8.0..8.0) },
-			linvel: Vec3 { x: rng.gen_range(-6.0..6.0), y: 10.0, z: rng.gen_range(-6.0..6.0) }
-		};
+		match item {
+    		Item::Alchemy => {
+				*velocity = Velocity::default();
+				
+				item_size.reset();
+		
+				transform.rotation = Quat::IDENTITY;
+				transform.translation = Vec3::new(rng.gen_range(3.0..6.0),7.5,0.0);
 
+				//transform.scale = Vec3::splat(0.01);
+			},
+    		Item::Ingredient => {
+				let player_translation = player_query.single().translation;
+		
+				*velocity = Velocity {
+					angvel: Vec3 { x: rng.gen_range(-8.0..8.0), y: rng.gen_range(-8.0..8.0), z: rng.gen_range(-8.0..8.0) },
+					linvel: Vec3 { x: rng.gen_range(-6.0..6.0), y: 10.0, z: rng.gen_range(-6.0..6.0) }
+				};
+		
+				item_size.reset();
+		
+				commands.entity(dropped_item)
+					.insert(DroppedItem::default())
+					.insert(RenderLayers::layer(0))
+					.insert(CollisionGroups::new(Group::GROUP_3, Group::GROUP_1));
+		
+				transform.translation = player_translation + Vec3::Y;
 
-		inventory_item.inventory = None;
-		inventory_item.current_size = 0.0;
-
-		commands.entity(dropped_item)
-			.insert(DroppedItem::default())
-			.insert(RenderLayers::layer(0))
-			.insert(CollisionGroups::new(Group::GROUP_3, Group::GROUP_1));
-
-		transform.translation = parent_transfrom.translation + Vec3::Y;
-		transform.scale = Vec3::splat(0.01);
+				sound.play(game_assets.drop_item_sound.clone());
+				//transform.scale = Vec3::splat(0.01);
+			},
+			Item::Potion(potion) => {
+				todo!()
+			}
+		}		
 	}
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::type_complexity)]
 pub fn pickup_entity(
 	mut commands: Commands,
-	player_query: Query<(Entity, &Transform, &ActionState<Action>), (With<Player>, Without<DroppedItem>)>,
+	player_query: Query<(&Transform, &ActionState<Action>), (With<Player>, Without<DroppedItem>)>,
 	ingredient_query: Query<(Entity, &Transform, &Ingredient, &SpawnableInstance, &NamedMaterials), Without<DroppedItem>>,
-	mut dropped_item_query: Query<(Entity, &mut Transform, &mut InventoryItem, &mut Velocity), With<DroppedItem>>,
+	mut dropped_item_query: Query<(Entity, &mut Transform, &mut ItemSize, &mut Velocity), With<DroppedItem>>,
 	finder_query: Query<(Entity, &Name)>,
 	child_query: Query<&Children>,
 	spawnables: Res<Assets<Spawnable>>,
+	game_assets: Res<GameAssets>,
+	sound: Res<Audio>,
 ) {
-	let Ok((player_entity, player_transform, input)) = player_query.get_single() else {
+	let Ok((player_transform, input)) = player_query.get_single() else {
 		return;
 	};
 
@@ -122,19 +252,16 @@ pub fn pickup_entity(
 	}
 
 	#[derive(Debug)]
-	enum Interactable<'a> {
-		Pickupable((Entity, &'a Transform, &'a Ingredient, &'a SpawnableInstance, &'a NamedMaterials)),
-		DroppedItem((Entity, &'a Transform, &'a InventoryItem, &'a Velocity)),
+	enum Interactable {
+		Pickupable,
+		DroppedItem,
 	}
 
 	let closest_interactable = ingredient_query.iter()
-		.map(Interactable::Pickupable)
-		.chain(dropped_item_query.iter().map(Interactable::DroppedItem)) 
+		.map(|q| (q.0, q.1, Interactable::Pickupable))
+		.chain(dropped_item_query.iter().map(|q| (q.0, q.1, Interactable::DroppedItem))) 
 		.filter_map(|c| {
-			let transform = match c {
-    			Interactable::Pickupable((_,t,_,_,_)) => t,
-    			Interactable::DroppedItem((_,t,_,_)) => t,
-			};
+			let transform = c.1;
 
 			let distance_sq = (transform.translation - player_transform.translation).length_squared();
 			if distance_sq < 4.0 {
@@ -148,7 +275,10 @@ pub fn pickup_entity(
 
 	match closest_interactable {
 		None => (),
-		Some(Interactable::Pickupable((entity,_ , ingredient, spawnable_instance, named_materials))) => {
+		Some((entity,_,Interactable::Pickupable)) => {
+			let Ok((entity,_ , ingredient, spawnable_instance, named_materials)) = ingredient_query.get(entity) else {
+				return;
+			};
 
 			let Some(spawnable) = spawnables.get(&spawnable_instance.handle) else {
 				warn!("Did not find spawnable in assets!");
@@ -183,63 +313,58 @@ pub fn pickup_entity(
 		
 			let size = spawnable_instance.size;
 		
-			let _entity = commands.spawn((
+			commands.spawn((
 				Name::new(ingredient.name.clone()),
-				SceneBundle {
+				InventoryItemBundle {
 					scene: ingredient_info.inventory_scene.clone(),
 					transform: Transform::from_xyz(rng.gen_range(-0.5..0.5), 2.0 + rng.gen_range(-0.5..0.5), 0.0)
 						.with_scale(Vec3::splat(0.01)),
+					velocity: Velocity { 
+						angvel: Vec3::new(rng.gen_range(-5.0..5.0),rng.gen_range(-5.0..5.0),rng.gen_range(-5.0..5.0)),
+						..default()
+					},
+					inventory_item: Item::Ingredient,
+					item_size: ItemSize::new(size, false),
+					collider: ingredient_info.collider.clone(),
 					..default()
 				},
 				ingredient.clone(),
 				named_materials.clone(),
-				InventoryItem {
-					size,
-					inventory: Some(player_entity),
-					..default() 
-				},
-				LockedAxes:: TRANSLATION_LOCKED_Z,
-				RigidBody::Dynamic,
-				RenderLayers::layer(2),
-				CollisionGroups::new(Group::GROUP_2,Group::GROUP_2),
-				Velocity {
-					angvel: Vec3 { x: rng.gen_range(-5.0..5.0), y: rng.gen_range(-5.0..5.0), z: rng.gen_range(-5.0..5.0) },
-					..default()
-				},
 				Damping {
     			    linear_damping: 0.5,
     			    angular_damping: 0.7,
     			},
-				ingredient_info.collider.clone(),
 			));
+
+			sound.play(game_assets.pickup_sound.clone());
+
+			if ingredient.is_rare {
+				sound.play(game_assets.rare_sound.clone());
+			}
 		}
-		Some(Interactable::DroppedItem((entity,_,_,_))) => {
-			let Ok((_,mut transform,mut ii,mut velocity)) = dropped_item_query.get_mut(entity) else  {
+		Some((entity,_,Interactable::DroppedItem)) => {
+			let Ok((_,mut transform, mut item_size, mut velocity)) = dropped_item_query.get_mut(entity) else  {
 				return;
 			};
 
 			let mut rng = thread_rng();
-
-			ii.inventory = Some(player_entity);
-			ii.current_size = 0.0;
 
 			*velocity = Velocity {
 				angvel: Vec3 { x: rng.gen_range(-5.0..5.0), y: rng.gen_range(-5.0..5.0), z: rng.gen_range(-5.0..5.0) },
 				..default()
 			};
 
+			item_size.reset();
+
 			commands.entity(entity)
 				.remove::<DroppedItem>()
-				.insert(InventoryItem {
-					size: ii.size,
-					inventory: Some(player_entity), 
-					..default() 
-				})
 				.insert(RenderLayers::layer(2))
 				.insert(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
 
-			transform.translation = Vec3::new(rng.gen_range(-1.0..1.0), 5.0 + rng.gen_range(-1.0..1.0), 0.0);
-			transform.scale = Vec3::splat(0.01);
+			transform.translation = Vec3::new(rng.gen_range(-0.5..0.5), 2.0 + rng.gen_range(-0.5..0.5), 0.0);
+			//transform.scale = Vec3::splat(0.01);
+
+			sound.play(game_assets.pickup_sound.clone());
 		}
 	}
 }
@@ -252,7 +377,7 @@ fn move_grabber (
 ) {
 	let Ok((grabber_transform, mut velocity, grabber)) = grabber.get_single_mut() else { return; };
 
-	if grabber.0.is_none() {
+	if grabber.grabbed_entity.is_none() {
 		return;
 	}
 
@@ -265,19 +390,21 @@ fn move_grabber (
 
 	let Some(ray) = camera.viewport_to_world(camera_transform, mouse_position) else { return; };
 
-	let filter = QueryFilter::only_dynamic().exclude_sensors().groups(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
-	let Some(distance) = rapier_context.cast_ray(ray.origin, ray.direction, 100.0, true, filter).map(|a| a.1).or(ray.intersect_plane(Vec3::ZERO, Vec3::Z)) else { return; };
+	//let filter = QueryFilter::only_dynamic().exclude_sensors().groups(CollisionGroups::new(Group::GROUP_2, Group::GROUP_2));
+	//let Some(distance) = rapier_context.cast_ray(ray.origin, ray.direction, 100.0, true, filter).map(|a| a.1).or(ray.intersect_plane(Vec3::ZERO, Vec3::Z)) else { return; };
+
+	let Some(distance) = ray.intersect_plane(Vec3::ZERO, Vec3::Z) else { return; };
 
 	let intersect = ray.get_point(distance);
 
 	velocity.linvel = (intersect - grabber_transform.translation).clamp_length_max(3.0) * 8.0;
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::type_complexity)]
+
+
 fn item_grab_system(
 	mut commands: Commands,
-	ingridient_query: Query<Entity, With<InventoryItem>>,
+	item_query: Query<Entity, With<Item>>,
 	parent_query: Query<&Parent>,
 	rapier_context: Res<RapierContext>,
 	inventory_camera: Query<(&GlobalTransform, &Camera), With<InventoryCamera>>,
@@ -288,12 +415,13 @@ fn item_grab_system(
 ) {
 	let Ok((grabber_entity, mut grabber_transform, mut grabber)) = grabber_query.get_single_mut() else { return; };
 
-	if input.single().just_released(Action::Click) { 
-		if let Some(grabbed) = grabber.0 {
+	if input.single().just_released(Action::Click) || grabber.ungrab { 
+		if let Some(grabbed) = grabber.grabbed_entity {
 			commands.entity(grabbed)
 				.remove::<ImpulseJoint>();
 		}
-		grabber.0 = None;
+		grabber.grabbed_entity = None;
+		grabber.ungrab = false;
 		return; 
 	}
 
@@ -314,9 +442,9 @@ fn item_grab_system(
 
 	let i_entity;
 
-	if let Ok(entity) = ingridient_query.get(entity) {
+	if let Ok(entity) = item_query.get(entity) {
 		i_entity = entity;
-	} else if let Some(entity) = parent_query.iter_ancestors(entity).find_map(|parent| ingridient_query.get(parent).ok()) { 
+	} else if let Some(entity) = parent_query.iter_ancestors(entity).find_map(|parent| item_query.get(parent).ok()) { 
 		i_entity = entity;
 	} else {
 		return;
@@ -332,10 +460,10 @@ fn item_grab_system(
 	
 	grabber_transform.translation = hit_global_pos;
 
-	grabber.0 = Some(entity);
+	grabber.grabbed_entity = Some(entity);
 
 	let joint = SphericalJointBuilder::new()
-    	.local_anchor1(Vec3::ZERO)
+    	.local_anchor1(Vec3::new(0.0,0.01,0.0))
     	.local_anchor2(hit_local_pos);
 
 	commands.entity(entity)

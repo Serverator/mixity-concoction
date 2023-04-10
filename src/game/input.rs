@@ -18,7 +18,8 @@ pub fn default_inputs() -> InputManagerBundle::<Action> {
 			.insert(MouseButton::Left, Action::Click)
 			.insert(DualAxis::left_stick(), Action::Move)
 			.insert(VirtualDPad::wasd(), Action::Move)
-			.insert(KeyCode::E, Action::Use)
+			.insert(QwertyScanCode::E, Action::Use)
+			.insert(QwertyScanCode::Space, Action::OpenCrafring)
 			.insert(GamepadButtonType::RightTrigger2, Action::Use)
 			.insert(DualAxis::right_stick(), Action::Look)
 			.insert(DualAxis::mouse_motion(), Action::Look)
@@ -36,14 +37,12 @@ pub enum Action {
 	Look,
 	ActivateLook,
 	Zoom,
+	OpenCrafring,
 }
 
 pub fn cursor_grab_system(
     mut windows: Query<&mut Window>,
-    //mouse: Res<Input<MouseButton>>,
 	input: Query<&ActionState<Action>>,
-    //key: Res<Input<KeyCode>>,
-	//mut cursor_mode: ResMut<CursorMode>,
 	#[cfg(debug_assertions)]
     mut gui: Query<&mut bevy_inspector_egui::bevy_egui::EguiContext>,
 ) {

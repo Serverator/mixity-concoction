@@ -1,4 +1,4 @@
-use bevy::scene::SceneInstance;
+use bevy::{scene::SceneInstance, math::Vec3Swizzles};
 
 use crate::{prelude::*, assets::{SHADOW_BUNDLE, SpawnableArchetype, Spawnable, SceneInstanceReady}, game::ingredient::{Ingredient, IngredientType}};
 
@@ -31,6 +31,8 @@ pub struct OccupiedSpawnSpace(Vec<(Vec2,f32)>);
 #[derive(Component, Clone, Copy)]
 pub struct Shadow;
 
+const ISLAND_SIZE: f32 = 250.0;
+
 #[derive(Component, Clone, Debug)]
 pub struct SpawnableInstance {
 	pub handle: Handle<Spawnable>,
@@ -42,25 +44,26 @@ pub struct SpawnableInstance {
 fn init_world(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
-	mut materials: ResMut<Assets<FoliageMaterial>>,
 	mut standard_mat: ResMut<Assets<StandardMaterial>>,
+	game_assets: Res<GameAssets>,
 ) {
-	
-	let plane_mesh = Mesh::from(shape::Plane { size: 1.0, subdivisions: 0 });
 
 	// Plane
 	commands.spawn((
 		Name::new("Main Plane"),
-		Collider::from_bevy_mesh(&plane_mesh, &ComputedColliderShape::TriMesh).unwrap(),
-		MaterialMeshBundle::<FoliageMaterial> {
-			mesh: meshes.add(plane_mesh),
-			transform: Transform::from_scale(Vec3::splat(600.0)),
-			material: materials.add(FoliageMaterial {
-				color: Color::YELLOW_GREEN, //Color::hsl(rng.gen_range(0.0..360.0), 1.0, 0.5),
-				..default()
-			}),
+		Collider::compound(vec![
+			(Vec3::Y * -0.5, Quat::IDENTITY, Collider::cylinder(0.5,1.0)),
+			(Vec3::Y * -0.5, Quat::IDENTITY, Collider::cylinder(0.5,0.5)),
+		]),
+		SceneBundle {
+			scene: game_assets.floating_island_scene.clone(),
+			transform: Transform::from_scale(Vec3::new(ISLAND_SIZE,ISLAND_SIZE * 0.8,ISLAND_SIZE)),
 			..default()
 		},
+		NamedMaterials(smallvec![
+			NamedMaterial::new("Island", Color::rgb(0.3,0.15,0.0)),
+			NamedMaterial::new("Grass", Color::YELLOW_GREEN),
+		]),
 		RigidBody::Fixed,
 		CollisionGroups::new(Group::GROUP_1, Group::GROUP_1 | Group::GROUP_3),
 	));
@@ -108,6 +111,8 @@ fn init_world(
 		color: Color::ALICE_BLUE,
 		brightness: 0.15,
 	});
+
+	commands.insert_resource(ClearColor(Color::BLACK));
 }
 
 fn check_if_finished(
@@ -126,7 +131,6 @@ fn spawn_spawnables(
 	mut occupied_space: ResMut<OccupiedSpawnSpace>,
 	spawnable_assets: Res<Assets<Spawnable>>,
 ) {
-	const SPAWN_SIZE: f32 = 200.0;
 
 	let mut rng = rand::thread_rng();
 
@@ -141,18 +145,20 @@ fn spawn_spawnables(
 		VisibilityBundle::default(),
 	)).id();
 
-	for i in 0..12000 {
+	for _ in 0..12000 {
 		let Some((spawnable_handle,spawnable)) = choose_spawnable.get_random(&mut rng) else {
 			warn!("Couldn't randomly choose spawnable from assets!");
 			continue;
 		};
 
-		let position = Vec2::new(rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE), rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE));
+		let position = (Quat::from_rotation_y(rng.gen_range(-PI..PI)) * (Vec3::Z * rng.gen_range(0.0..1.0f32).sqrt() * (ISLAND_SIZE - 5.0))).xz();
 
-		let is_rare = rng.gen_bool(0.005);
+		//let position = Vec2::new(rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE), rng.gen_range(-SPAWN_SIZE..SPAWN_SIZE));
+
+		let is_rare = rng.gen_bool(1.0/500.0);
 
 		let relative_scale = if is_rare {
-			rng.gen_range(1.0..2.0)
+			rng.gen_range(1.35..1.8)
 		} else {
 			rng.gen_range(0.7..1.35)
 		};
@@ -166,6 +172,8 @@ fn spawn_spawnables(
 
 		// Set space as occupied
 		occupied_space.0.push((position, spawnable.size * relative_scale));
+
+		let (materials, color) = NamedMaterials::generate_materials(spawnable.archetype, is_rare, &mut rng);
 
 		let mut entity = commands.spawn((
 			RigidBody::Fixed,
@@ -184,26 +192,26 @@ fn spawn_spawnables(
 			},
 			CollisionGroups::new(Group::GROUP_1, Group::GROUP_1 | Group::GROUP_3),
 			// Applies materials to the spawned scene
-			NamedMaterials::generate_materials(spawnable.archetype, is_rare, &mut rng),
+			materials,
 		));
 
-		match spawnable.archetype {
-    		SpawnableArchetype::Tree => {
-				entity.insert((
-					Name::new(format!("Tree {i}")),
-				));
-			},
-    		SpawnableArchetype::Bush => {
-				entity.insert((
-					Name::new(format!("Bush {i}")),
-				));
-			},
-    		SpawnableArchetype::Mushroom => {
-				entity.insert((
-					Ingredient::generate_random_ingredient(&mut rng, IngredientType::Mushroom, is_rare),
-					Name::new(format!("Mushroom {i}")),
-				));
-			},
+		if spawnable.ingredient.is_some()  {
+			match spawnable.archetype {
+				SpawnableArchetype::Tree => {
+					entity.insert((
+					));
+				},
+				SpawnableArchetype::Bush => {
+					entity.insert((
+						Ingredient::generate_random_ingredient(&mut rng, IngredientType::Berry, is_rare, color),
+					));
+				},
+				SpawnableArchetype::Mushroom => {
+					entity.insert((
+						Ingredient::generate_random_ingredient(&mut rng, IngredientType::Mushroom, is_rare, color),
+					));
+				},
+			}
 		}
 
 		// Collider

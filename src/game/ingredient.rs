@@ -2,12 +2,25 @@ use crate::prelude::*;
 
 use super::effects::Effect;
 
+#[derive(Debug, Clone, Component, Reflect, FromReflect)]
+pub enum Grind {
+	Grinding(f32),
+	Grinded
+}
 
-#[derive(Debug, Clone, Component, Default, Reflect)]
+impl Default for Grind {
+    fn default() -> Self {
+        Self::Grinding(0.0)
+    }
+}
+
+#[derive(Debug, Clone, Component, Default, Reflect, FromReflect)]
 pub struct Ingredient {
 	pub ingredient_type: IngredientType,
 	pub name: String,
 	pub is_rare: bool,
+	pub color: Color,
+	pub grind: Grind,
 	pub effects: SmallVec<[IngredientEffect;4]>,
 }
 
@@ -31,7 +44,8 @@ pub enum IngredientType {
 impl Ingredient {
 	#[allow(dead_code)]
 	// TODO_OLEG: Generate random ingredients
-	pub fn generate_random_ingredient(rng: &mut impl Rng, ingredient_type: IngredientType, is_rare: bool) -> Self {
+	// Unused :(
+	pub fn generate_random_ingredient(rng: &mut impl Rng, ingredient_type: IngredientType, is_rare: bool, color: Color) -> Self {
 
 		let name;
 		let effects;
@@ -71,8 +85,10 @@ impl Ingredient {
 		Ingredient { 
 			name, 
 			effects, 
+			color,
 			is_rare,
 			ingredient_type,
+			..default()
 		}
 	}
 }

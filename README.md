@@ -1,20 +1,9 @@
 # **Project Concoction**
-## This is a game made for Bevy Jam 3
+### This is a game made for Bevy Jam 3
 
-Still highly **WIP**!
+This branch contains version of the game (or rather prototype) that was uploaded to the GameJam.
+
+The code is quite unreadable, I am very sorry for that one. I was really time constrained.
+Last day I just splattered systems whenever I could cram them, project and structure is in chaos.
 
 Feel free to look at this code and reuse parts of it in your games
-
-# **TODO list:**
-### __Essential before deadline:__
-- Add alchemy potion mixing. [ASAP] WIP
-- Add effects and eatind [ASAP]
-- Add character [DONE!]
-- Sound design [SOME DONE]
-### __Nice to haves:__
-- More vegetation. A lot more.
-- Alchemy shop
-- Add main menu / UI
-- Add enemies
-
-I wish I had more time... **OR HANDS ON BOARD**

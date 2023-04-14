@@ -6,8 +6,8 @@ use crate::prelude::*;
 
 mod assets;
 mod game;
-mod main_menu;
 mod helper;
+mod main_menu;
 
 #[cfg(debug_assertions)]
 mod debug;
@@ -26,8 +26,6 @@ fn main() {
 					primary_window: Some(Window {
 						title: "Mixity Concoction".to_string(),
 						present_mode: bevy::window::PresentMode::Immediate,
-						//resolution: WindowResolution::new(600.0, 350.0),
-						mode: bevy::window::WindowMode::Fullscreen,
 						..default()
 					}),
 					..default()
@@ -56,14 +54,13 @@ pub mod prelude {
 	pub use bevy_rapier3d::prelude::*;
 	pub use leafwing_input_manager::prelude::*;
 	pub use rand::prelude::*;
-	pub use std::f32::consts::PI;
 	pub use smallvec::*;
+	pub use std::f32::consts::PI;
 
-	
-	pub use crate::helper::*;
 	pub use crate::assets::GameAssets;
 	pub use crate::game::input::*;
 	pub use crate::game::materials::*;
+	pub use crate::helper::*;
 	pub use crate::GameState;
 
 	#[cfg(debug_assertions)]

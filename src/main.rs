@@ -25,7 +25,7 @@ fn main() {
 				.set(bevy::prelude::WindowPlugin {
 					primary_window: Some(Window {
 						title: "Mixity Concoction".to_string(),
-						present_mode: bevy::window::PresentMode::Immediate,
+						//present_mode: bevy::window::PresentMode::Immediate,
 						..default()
 					}),
 					..default()

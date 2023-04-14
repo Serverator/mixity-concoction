@@ -26,8 +26,6 @@ fn main() {
 					primary_window: Some(Window {
 						title: "Mixity Concoction".to_string(),
 						present_mode: bevy::window::PresentMode::Immediate,
-						//resolution: WindowResolution::new(600.0, 350.0),
-						mode: bevy::window::WindowMode::Fullscreen,
 						..default()
 					}),
 					..default()

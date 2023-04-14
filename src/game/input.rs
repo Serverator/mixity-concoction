@@ -1,17 +1,14 @@
-
-
 use crate::prelude::*;
 
 pub struct InputPlugin;
 impl Plugin for InputPlugin {
 	fn build(&self, app: &mut App) {
-		app
-			.add_plugin(InputManagerPlugin::<Action>::default())
+		app.add_plugin(InputManagerPlugin::<Action>::default())
 			.add_system(cursor_grab_system);
 	}
 }
 
-pub fn default_inputs() -> InputManagerBundle::<Action> {
+pub fn default_inputs() -> InputManagerBundle<Action> {
 	InputManagerBundle::<Action> {
 		action_state: ActionState::default(),
 		input_map: InputMap::default()
@@ -32,7 +29,7 @@ pub fn default_inputs() -> InputManagerBundle::<Action> {
 #[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
 pub enum Action {
 	Click,
-    Move,
+	Move,
 	Use,
 	Look,
 	ActivateLook,
@@ -41,12 +38,11 @@ pub enum Action {
 }
 
 pub fn cursor_grab_system(
-    mut windows: Query<&mut Window>,
+	mut windows: Query<&mut Window>,
 	input: Query<&ActionState<Action>>,
-	#[cfg(debug_assertions)]
-    mut gui: Query<&mut bevy_inspector_egui::bevy_egui::EguiContext>,
+	#[cfg(debug_assertions)] mut gui: Query<&mut bevy_inspector_egui::bevy_egui::EguiContext>,
 ) {
-    let mut window = windows.single_mut();
+	let mut window = windows.single_mut();
 
 	let Ok(input) = input.get_single() else {
 		return;
@@ -62,13 +58,13 @@ pub fn cursor_grab_system(
 	}
 
 	#[cfg(not(debug_assertions))]
-    if input.just_pressed(Action::ActivateLook) {
-        window.cursor.grab_mode = bevy::window::CursorGrabMode::Locked;
-        window.cursor.visible = false;
-    }
+	if input.just_pressed(Action::ActivateLook) {
+		window.cursor.grab_mode = bevy::window::CursorGrabMode::Locked;
+		window.cursor.visible = false;
+	}
 
-    if input.just_released(Action::ActivateLook) {
-        window.cursor.grab_mode = bevy::window::CursorGrabMode::None;
-        window.cursor.visible = true;
-    }
+	if input.just_released(Action::ActivateLook) {
+		window.cursor.grab_mode = bevy::window::CursorGrabMode::None;
+		window.cursor.visible = true;
+	}
 }

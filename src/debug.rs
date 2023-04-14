@@ -7,8 +7,7 @@ pub struct DebugPlugin;
 
 impl Plugin for DebugPlugin {
 	fn build(&self, app: &mut App) {
-		app
-			.add_plugin(WorldInspectorPlugin::new())
+		app.add_plugin(WorldInspectorPlugin::new())
 			//.add_plugin(RapierDebugRenderPlugin {
 			//	always_on_top: true,
 			//	..default()

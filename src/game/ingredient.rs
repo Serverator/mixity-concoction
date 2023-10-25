@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 use super::effects::EffectType;
 
-#[derive(Debug, Clone, Component, Reflect, FromReflect, PartialEq)]
+#[derive(Debug, Clone, Component, Reflect, PartialEq)]
 pub enum Grind {
 	Grinding(f32),
 	Grinded,
@@ -14,7 +14,7 @@ impl Default for Grind {
 	}
 }
 
-#[derive(Debug, Clone, Component, Default, Reflect, FromReflect)]
+#[derive(Debug, Clone, Component, Default, Reflect)]
 pub struct Ingredient {
 	pub ingredient_type: IngredientType,
 	pub name: String,
@@ -25,14 +25,14 @@ pub struct Ingredient {
 	pub effects: SmallVec<[IngredientEffect; 4]>,
 }
 
-#[derive(Clone, Copy, Debug, Reflect, FromReflect)]
+#[derive(Clone, Copy, Debug, Reflect)]
 pub struct IngredientEffect {
 	pub effect_type: EffectType,
 	pub duration: f32,
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Reflect, FromReflect)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, Reflect)]
 // TODO_OLEG: Add more ingredient types
 pub enum IngredientType {
 	#[default]

@@ -3,8 +3,8 @@ use crate::prelude::*;
 pub struct PhysicsPlugin;
 impl Plugin for PhysicsPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_startup_system(configure_physics)
-			.add_plugin(RapierPhysicsPlugin::<NoUserData>::default());
+		app .add_systems(Startup, configure_physics)
+			.add_plugins(RapierPhysicsPlugin::<NoUserData>::default());
 	}
 }
 

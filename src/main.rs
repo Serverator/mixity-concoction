@@ -8,6 +8,7 @@ mod assets;
 mod game;
 mod helper;
 mod main_menu;
+mod loading;
 
 #[cfg(debug_assertions)]
 mod debug;
@@ -31,11 +32,14 @@ fn main() {
 					..default()
 				}),
 		)
-		.add_plugin(game::GamePlugin)
-		.add_plugin(assets::AssetLoadingPlugin);
+		.add_plugins((
+			game::GamePlugin,
+			loading::LoadingPlugin,
+			assets::AssetLoadingPlugin
+		));
 
 	#[cfg(debug_assertions)]
-	app.add_plugin(debug::DebugPlugin);
+	app.add_plugins(debug::DebugPlugin);
 
 	app.run();
 }
@@ -67,6 +71,4 @@ pub mod prelude {
 	pub use bevy_inspector_egui::prelude::*;
 	#[cfg(debug_assertions)]
 	pub use bevy_inspector_egui::quick::WorldInspectorPlugin;
-	#[cfg(debug_assertions)]
-	pub use bevy_prototype_debug_lines::*;
 }

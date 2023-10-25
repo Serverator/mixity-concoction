@@ -1,9 +1,12 @@
+use std::sync::OnceLock;
+
 use crate::prelude::*;
 use bevy::ecs::query::ReadOnlyWorldQuery;
+use bevy::reflect::TypePath;
 use bevy::{
 	gltf::Gltf,
 	reflect::TypeUuid,
-	render::{once_cell::sync::OnceCell, view::RenderLayers},
+	render::view::RenderLayers,
 	scene::SceneInstance,
 };
 pub use bevy_asset_loader::prelude::*;
@@ -18,8 +21,8 @@ impl Plugin for AssetLoadingPlugin {
 					.continue_to_state(GameState::GeneratingWorld),
 			)
 			.add_collection_to_loading_state::<_, GameAssets>(GameState::LoadingAssets)
-			.add_system(setup.in_schedule(OnExit(GameState::LoadingAssets)))
-			.add_systems((
+			.add_systems(OnExit(GameState::LoadingAssets), setup)
+			.add_systems(Update, (
 				check_scene_init,
 				update_scene_children::<RenderLayers, With<Handle<Mesh>>>,
 				update_scene_children::<CollisionGroups, With<Collider>>,
@@ -34,9 +37,9 @@ pub struct CalculatedColliders {
 	pub potions: Vec<Collider>,
 }
 
-pub static SHADOW_BUNDLE: OnceCell<(Handle<StandardMaterial>, Handle<Mesh>)> = OnceCell::new();
+pub static SHADOW_BUNDLE: OnceLock<(Handle<StandardMaterial>, Handle<Mesh>)> = OnceLock::new();
 
-pub static DEFAULT_FOLIAGE: OnceCell<Handle<FoliageMaterial>> = OnceCell::new();
+pub static DEFAULT_FOLIAGE: OnceLock<Handle<FoliageMaterial>> = OnceLock::new();
 
 fn setup(
 	mut commands: Commands,
@@ -256,7 +259,7 @@ pub enum PickUpEvent {
 	Replace(Handle<Scene>),
 }
 
-#[derive(TypeUuid)]
+#[derive(TypeUuid, TypePath)]
 #[uuid = "2e680e06-a271-4804-8f5a-73927db8dec4"]
 pub struct Spawnable {
 	pub id: usize,
@@ -282,7 +285,7 @@ impl std::hash::Hash for Spawnable {
 	}
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Reflect)]
 pub enum SpawnableArchetype {
 	Tree,
 	Bush,

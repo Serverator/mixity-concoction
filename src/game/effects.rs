@@ -13,10 +13,13 @@ use super::{
 pub struct EffectsPlugin;
 impl Plugin for EffectsPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems((spawn_arrows,).in_schedule(OnEnter(GameState::InGame)))
+		app .add_systems(
+				OnEnter(GameState::InGame), 
+				spawn_arrows
+			)
 			.add_systems(
-				(effect_tick, rotate_arrow, gravity_effects, earthquake)
-					.in_set(OnUpdate(GameState::InGame)),
+				Update,
+				(effect_tick, rotate_arrow, gravity_effects, earthquake).run_if(in_state(GameState::InGame))
 			)
 			.insert_resource(ActiveEffects::default());
 	}
@@ -178,7 +181,7 @@ fn gravity_effects(active_effects: Res<ActiveEffects>, mut config: ResMut<Rapier
 	}
 }
 
-#[derive(Debug, Clone, Copy, Reflect, FromReflect, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Reflect, PartialEq, Eq, Hash)]
 pub enum EffectType {
 	Haste,            // DONE
 	Slowness,         // DONE
@@ -227,7 +230,7 @@ pub fn earthquake(
 }
 
 /// Effects and time left for them to wear off
-#[derive(Clone, Copy, Debug, Reflect, FromReflect)]
+#[derive(Clone, Copy, Debug, Reflect)]
 pub struct Effect {
 	pub effect: EffectType,
 	pub potency: f32,

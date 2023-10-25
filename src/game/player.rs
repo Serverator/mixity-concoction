@@ -7,12 +7,8 @@ use super::{backpack::Inventory, effects::ActiveEffects, world::Shadow};
 pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_system(spawn_player.in_schedule(OnEnter(GameState::InGame)))
-			.add_systems(
-				(move_player, camera_follow)
-					.chain()
-					.in_set(OnUpdate(GameState::InGame)),
-			)
+		app .add_systems(OnEnter(GameState::InGame), spawn_player)
+			.add_systems(Update, (move_player, camera_follow).chain().run_if(in_state(GameState::InGame)))
 			.register_type::<Inventory>();
 	}
 }

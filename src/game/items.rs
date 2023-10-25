@@ -20,7 +20,7 @@ use super::{
 // 	pub size: f32,
 // }
 
-#[derive(Component, Debug, Clone, Copy, Reflect, FromReflect)]
+#[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct ItemSize {
 	pub shrinking: bool,
 	pub size_mult: f32,
@@ -69,14 +69,14 @@ impl ItemSize {
 	}
 }
 
-#[derive(Component, Debug, Clone, Reflect, FromReflect)]
+#[derive(Component, Debug, Clone, Reflect)]
 pub enum Item {
 	AlchemyTool,
 	Ingredient,
 	Potion(Potion),
 }
 
-#[derive(Default, Clone, Reflect, FromReflect, Debug)]
+#[derive(Default, Clone, Reflect, Debug)]
 pub enum Potion {
 	#[default]
 	Empty,
@@ -137,30 +137,18 @@ pub struct ItemsPlugin;
 impl Plugin for ItemsPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
+			OnEnter(GameState::InGame),
 			(
-				// Run on game start
 				init,
 			)
-				.in_schedule(OnEnter(GameState::InGame)),
 		)
 		.add_systems(
-			(
-				// Update in game state
+			Update, (
 				pickup_entity,
-			)
-				.in_set(OnUpdate(GameState::InGame)),
+				( drop_items, animate_size, item_grab_system ).chain()
+			).run_if(in_state(GameState::InGame))
 		)
-		.add_systems(
-			(
-				// Update in game state
-				drop_items,
-				animate_size,
-				item_grab_system,
-			)
-				.chain()
-				.in_set(OnUpdate(GameState::InGame)),
-		)
-		.add_system(move_grabber.in_base_set(CoreSet::FixedUpdate))
+		.add_systems(FixedUpdate, move_grabber)
 		.register_type::<Item>()
 		.register_type::<ItemSize>();
 	}
@@ -203,9 +191,7 @@ fn drop_items(
 	mut grabber_query: Query<&mut Grabber>,
 	player_query: Query<&Transform, With<Player>>,
 	_potion_query: Query<&Item>,
-	//transform_query: Query<&Transform, Without<Item>>,
 	game_assets: Res<GameAssets>,
-	sound: Res<Audio>,
 ) {
 	let mut grabber = grabber_query.single_mut();
 
@@ -250,14 +236,16 @@ fn drop_items(
 
 				commands
 					.entity(dropped_item)
-					.insert(DroppedItem::default())
+					.insert(DroppedItem)
 					.insert(RenderLayers::layer(0))
 					.insert(CollisionGroups::new(Group::GROUP_3, Group::GROUP_1));
 
 				transform.translation = player_translation + Vec3::Y;
 
-				sound.play(game_assets.drop_item_sound.clone());
-				//transform.scale = Vec3::splat(0.01);
+				commands.spawn(AudioBundle {
+					source: game_assets.drop_item_sound.clone(),
+					..default()
+				});
 			}
 		}
 	}
@@ -286,7 +274,6 @@ pub fn pickup_entity(
 	game_assets: Res<GameAssets>,
 	active_effects: Res<ActiveEffects>,
 	mut hallucination_message: Local<bool>,
-	sound: Res<Audio>,
 ) {
 	let Ok((player_transform, input)) = player_query.get_single() else {
 		return;
@@ -344,10 +331,16 @@ pub fn pickup_entity(
 				if rng.gen_bool(lerp(0.2..=0.5, hallucination.potency as f64)) {
 					commands.entity(entity).despawn_recursive();
 					if !*hallucination_message {
-						sound.play(game_assets.insanity_sound.clone());
+						commands.spawn(AudioBundle {
+							source: game_assets.insanity_sound.clone(),
+							..default()
+						});
 						*hallucination_message = true;
 					} else if rng.gen_bool(0.1) {
-						sound.play(game_assets.wha_sound.clone());
+						commands.spawn(AudioBundle {
+							source: game_assets.wha_sound.clone(),
+							..default()
+						});
 					}
 					return;
 				}
@@ -413,10 +406,16 @@ pub fn pickup_entity(
 				},
 			));
 
-			sound.play(game_assets.pickup_sound.choose(&mut rng).unwrap().clone());
+			commands.spawn(AudioBundle {
+				source: game_assets.pickup_sound.choose(&mut rng).unwrap().clone(),
+				..default()
+			});
 
 			if ingredient.is_rare {
-				sound.play(game_assets.rare_sound.clone());
+				commands.spawn(AudioBundle {
+					source: game_assets.rare_sound.clone(),
+					..default()
+				});
 			}
 		}
 		Some((entity, _, Interactable::DroppedItem)) => {
@@ -431,10 +430,16 @@ pub fn pickup_entity(
 				if rng.gen_bool(lerp(0.2..=0.5, hallucination.potency as f64)) {
 					commands.entity(entity).despawn_recursive();
 					if !*hallucination_message {
-						sound.play(game_assets.insanity_sound.clone());
+						commands.spawn(AudioBundle {
+							source: game_assets.insanity_sound.clone(),
+							..default()
+						});
 						*hallucination_message = true;
 					} else if rng.gen_bool(0.1) {
-						sound.play(game_assets.wha_sound.clone());
+						commands.spawn(AudioBundle {
+							source: game_assets.wha_sound.clone(),
+							..default()
+						});
 					}
 					return;
 				}
@@ -464,7 +469,10 @@ pub fn pickup_entity(
 			);
 			//transform.scale = Vec3::splat(0.01);
 
-			sound.play(game_assets.pickup_sound.choose(&mut rng).unwrap().clone());
+			commands.spawn(AudioBundle {
+				source: game_assets.pickup_sound.choose(&mut rng).unwrap().clone(),
+				..default()
+			});
 		}
 	}
 }

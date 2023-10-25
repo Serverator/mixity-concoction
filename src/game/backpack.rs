@@ -9,13 +9,11 @@ use crate::prelude::*;
 pub struct BackpackPlugin;
 impl Plugin for BackpackPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems((spawn,).in_schedule(OnEnter(GameState::InGame)));
-
-		//.add_system(update_inventory_items)
+		app.add_systems(OnEnter(GameState::InGame), spawn);
 	}
 }
 
-#[derive(Component, Clone, Debug, Default, Reflect, FromReflect)]
+#[derive(Component, Clone, Debug, Default, Reflect)]
 pub struct Inventory(pub Vec<Entity>);
 
 #[derive(Component)]

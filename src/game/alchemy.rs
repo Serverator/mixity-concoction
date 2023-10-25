@@ -20,38 +20,37 @@ pub struct AlchemyPlugin;
 impl Plugin for AlchemyPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
-			(
-				// Run on game start
-				init_alchemy_table,
-			)
-				.in_schedule(OnEnter(GameState::InGame)),
+			OnEnter(GameState::InGame),
+			init_alchemy_table,
 		)
 		.add_systems(
+			Update,
 			(
 				// Update in game state
 				get_cauldron_liquid_material,
 				check_mortar_crushing,
 				rotate_head,
-				calculate_com,
-				check_eaten.after(calculate_com),
-				check_cauldroned.after(calculate_com),
-				consume_eaten.after(check_eaten),
-				consume_cauldroned.after(check_cauldroned),
+				(
+					calculate_com,
+					(
+						(check_cauldroned, consume_cauldroned).chain(),
+						(check_eaten, consume_eaten).chain()
+					)
+				).chain(),
 				mash_ingredient,
 				change_color,
 				spawn_new_bottle,
-			)
-				.in_set(OnUpdate(GameState::InGame)),
+			).run_if(in_state(GameState::InGame))
 		)
 		.register_type::<Mortar>()
 		.register_type::<Cauldron>();
 	}
 }
 
-#[derive(Component, Debug, Clone, Copy, Reflect, FromReflect)]
+#[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct Eaten;
 
-#[derive(Component, Debug, Clone, Copy, Reflect, FromReflect)]
+#[derive(Component, Debug, Clone, Copy, Reflect)]
 pub struct Cauldroned;
 
 #[derive(Component)]
@@ -376,7 +375,6 @@ fn consume_eaten(
 	>,
 	time: Res<Time>,
 	game_assets: Res<GameAssets>,
-	sound: Res<Audio>,
 	mut active_effects: ResMut<ActiveEffects>,
 ) {
 	if eaten_query.is_empty() {
@@ -399,15 +397,24 @@ fn consume_eaten(
 					transform.translation = Vec3::Y * 15.0;
 					item_size.shrinking = false;
 
-					sound.play(game_assets.blah_sound.clone());
+					commands.spawn(AudioBundle {
+						source: game_assets.blah_sound.clone(),
+						..default()
+					});
 				}
 				Item::Ingredient => {
 					commands.entity(entity).despawn_recursive();
 
 					if rng.gen_bool(0.05) {
-						sound.play(game_assets.delishs_sound.clone());
+						commands.spawn(AudioBundle {
+							source: game_assets.delishs_sound.clone(),
+							..default()
+						});
 					} else {
-						sound.play(game_assets.eat_sound.clone());
+						commands.spawn(AudioBundle {
+							source: game_assets.eat_sound.clone(),
+							..default()
+						});
 					}
 				}
 				Item::Potion(potion) => {
@@ -422,7 +429,10 @@ fn consume_eaten(
 						for effect in effects {
 							active_effects.0.push(effect);
 						}
-						sound.play(game_assets.drink_sound.clone());
+						commands.spawn(AudioBundle {
+							source: game_assets.drink_sound.clone(),
+							..default()
+						});
 					}
 
 					commands.entity(entity).despawn_recursive();
@@ -498,7 +508,6 @@ fn consume_cauldroned(
 	time: Res<Time>,
 	_cauldron_mat: Option<Res<CauldronLiquidMaterial>>,
 	_game_assets: Res<GameAssets>,
-	_sound: Res<Audio>,
 ) {
 	if cauldroned_query.is_empty() {
 		return;
@@ -588,7 +597,6 @@ fn check_eaten(
 	>,
 	mut grabber_query: Query<&mut Grabber>,
 	game_assets: Res<GameAssets>,
-	sound: Res<Audio>,
 ) {
 	let mut grabber = grabber_query.single_mut();
 	let head_transform = head_query.single();
@@ -619,7 +627,11 @@ fn check_eaten(
 			.insert(Velocity::zero());
 		item_size.shrinking = true;
 
-		sound.play(game_assets.suck_air_sound.clone());
+		commands.spawn(AudioBundle {
+			source: game_assets.suck_air_sound.clone(),
+			..default()
+		});
+
 		continue;
 	}
 }
@@ -646,7 +658,6 @@ fn check_cauldroned(
 	>,
 	mut grabber_query: Query<&mut Grabber>,
 	game_assets: Res<GameAssets>,
-	sound: Res<Audio>,
 	time: Res<Time>,
 ) {
 	let mut grabber = grabber_query.single_mut();
@@ -694,9 +705,15 @@ fn check_cauldroned(
 		item_size.shrinking = true;
 
 		if let Item::Potion(_) = item {
-			sound.play(game_assets.filling_potion_sound.clone());
+			commands.spawn(AudioBundle {
+				source: game_assets.filling_potion_sound.clone(),
+				..default()
+			});
 		} else {
-			sound.play(game_assets.sploosh_sound.clone());
+			commands.spawn(AudioBundle {
+				source: game_assets.sploosh_sound.clone(),
+				..default()
+			});
 		}
 
 		continue;
@@ -751,7 +768,6 @@ fn mash_ingredient(
 	mortar_query: Query<(&GlobalTransform, &CenterOfMass, &Mortar)>,
 	game_assets: Res<GameAssets>,
 	mut last_sound_time: Local<f32>,
-	sound: Res<Audio>,
 	time: Res<Time>,
 ) {
 	for (mortar_transform, mortar_local_com, _) in mortar_query.iter().filter(|m| m.2 .0) {
@@ -772,13 +788,13 @@ fn mash_ingredient(
 
 					if *last_sound_time < time.elapsed_seconds() - 0.5 {
 						*last_sound_time = time.elapsed_seconds();
-						sound.play(
-							game_assets
-								.grind_sound
-								.choose(&mut thread_rng())
-								.unwrap()
-								.clone(),
-						);
+						commands.spawn(AudioBundle {
+							source: game_assets.grind_sound
+										.choose(&mut thread_rng())
+										.unwrap()
+										.clone(),
+							..default()
+						});
 					}
 
 					if *amount > 0.35 {

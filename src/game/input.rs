@@ -3,8 +3,8 @@ use crate::prelude::*;
 pub struct InputPlugin;
 impl Plugin for InputPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugin(InputManagerPlugin::<Action>::default())
-			.add_system(cursor_grab_system);
+		app.add_plugins(InputManagerPlugin::<Action>::default())
+			.add_systems(Update, cursor_grab_system);
 	}
 }
 
@@ -26,7 +26,7 @@ pub fn default_inputs() -> InputManagerBundle<Action> {
 	}
 }
 
-#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug)]
+#[derive(Actionlike, PartialEq, Eq, Clone, Copy, Hash, Debug, Reflect)]
 pub enum Action {
 	Click,
 	Move,

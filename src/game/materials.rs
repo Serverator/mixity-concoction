@@ -1,9 +1,8 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::OnceLock};
 
 use bevy::{
 	reflect::TypeUuid,
 	render::{
-		once_cell::sync::OnceCell,
 		render_resource::{
 			AddressMode, AsBindGroup, AsBindGroupShaderType, FilterMode, SamplerDescriptor,
 			ShaderRef, ShaderType,
@@ -24,16 +23,16 @@ pub struct CustomMaterialPlugin;
 
 impl Plugin for CustomMaterialPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugin(MaterialPlugin::<FoliageMaterial>::default())
-			.add_system(set_dither_texture.in_schedule(OnExit(GameState::LoadingAssets)))
-			.add_system(replace_materials.in_base_set(CoreSet::PostUpdate))
+		app.add_plugins(MaterialPlugin::<FoliageMaterial>::default())
+			.add_systems(OnExit(GameState::LoadingAssets), set_dither_texture)
+			.add_systems(PostUpdate, replace_materials)
 			.register_type::<FoliageMaterial>()
 			.register_type::<NamedMaterials>()
 			.register_type::<NamedMaterial>();
 	}
 }
 
-static DITHER_HANDLE: OnceCell<Handle<Image>> = OnceCell::new();
+static DITHER_HANDLE: OnceLock<Handle<Image>> = OnceLock::new();
 
 pub fn set_dither_texture(game_assets: Res<GameAssets>, mut image_assets: ResMut<Assets<Image>>) {
 	let image_mut = image_assets.get_mut(&game_assets.dither_texture).unwrap();
@@ -51,7 +50,7 @@ pub fn set_dither_texture(game_assets: Res<GameAssets>, mut image_assets: ResMut
 		.unwrap();
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone, Copy, Default, Reflect, FromReflect)]
+#[derive(AsBindGroup, TypeUuid, Debug, Clone, Copy, Default, Reflect)]
 #[uuid = "33fbe40a-eff7-4e20-a44f-997397cf2085"]
 #[uniform(0, FoliageMaterialUniform)]
 pub struct FoliageMaterial {
@@ -92,7 +91,7 @@ impl Material for FoliageMaterial {
 	}
 }
 
-#[derive(Clone, Reflect, FromReflect, Default, Debug)]
+#[derive(Clone, Reflect, Default, Debug)]
 pub struct NamedMaterial {
 	pub name: Cow<'static, str>,
 	pub material: FoliageMaterial,

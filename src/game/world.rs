@@ -12,13 +12,10 @@ impl Plugin for WorldPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<OccupiedSpawnSpace>()
 			.add_systems(
-				(init_world, spawn_spawnables).in_schedule(OnEnter(GameState::GeneratingWorld)),
+				OnEnter(GameState::GeneratingWorld),
+				(init_world, spawn_spawnables),
 			)
-			.add_system(check_if_finished.in_set(OnUpdate(GameState::GeneratingWorld)));
-		// .add_systems((
-		// 	set_materials_to_spawnables,
-		// 		).in_set(OnUpdate(GameState::InGame))
-		// );
+			.add_systems(Update, check_if_finished.run_if(in_state(GameState::GeneratingWorld)));
 	}
 }
 
@@ -44,16 +41,16 @@ fn init_world(
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut standard_mat: ResMut<Assets<StandardMaterial>>,
 	game_assets: Res<GameAssets>,
-	audio: Res<Audio>,
+	//audio: Res<Audio>,
 ) {
-	audio.play_with_settings(
-		game_assets.music.clone(),
-		PlaybackSettings {
-			repeat: true,
-			volume: 0.2,
-			..default()
-		},
-	);
+	//audio.play_with_settings(
+	//	game_assets.music.clone(),
+	//	PlaybackSettings {
+	//		repeat: true,
+	//		volume: 0.2,
+	//		..default()
+	//	},
+	//);
 
 	// Plane
 	commands.spawn((
